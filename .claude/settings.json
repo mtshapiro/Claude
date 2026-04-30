@@ -5,7 +5,7 @@
       "args": [
         "server.py"
       ],
-      "cwd": "/path/to/datagov-mcp"
+      "cwd": "/home/user/Claude/datagov-mcp"
     }
   }
 }
