@@ -1,11 +1,11 @@
 {
   "mcpServers": {
-    "datagov-israel": {
-      "command": "python",
+    "supermarket-prices": {
+      "command": "npx",
       "args": [
-        "server.py"
-      ],
-      "cwd": "/path/to/datagov-mcp"
+        "-y",
+        "@skills-il/supermarket-prices-mcp"
+      ]
     }
   }
 }
