@@ -1,4 +1,5 @@
 {
+  "enableAllProjectMcpServers": true,
   "mcpServers": {
     "supermarket-prices": {
       "command": "npx",
