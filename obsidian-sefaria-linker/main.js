@@ -479,6 +479,30 @@ var SefariaLinkerPlugin = class extends import_obsidian.Plugin {
       }
     });
     this.addCommand({
+      id: "unlink-citations",
+      name: "Unlink Sefaria citations in current note",
+      callback: async () => {
+        var _a;
+        const file = this.app.workspace.getActiveFile();
+        if (!file) {
+          new import_obsidian.Notice("No active file");
+          return;
+        }
+        const content = await this.app.vault.read(file);
+        const stripped = content.replace(
+          /\[([^\]]+)\]\(https:\/\/www\.sefaria\.org\/[^)]+\)/g,
+          "$1"
+        );
+        if (stripped === content) {
+          new import_obsidian.Notice("No Sefaria links found");
+          return;
+        }
+        const count = ((_a = content.match(/\[([^\]]+)\]\(https:\/\/www\.sefaria\.org\/[^)]+\)/g)) != null ? _a : []).length;
+        await this.app.vault.modify(file, stripped);
+        new import_obsidian.Notice(`Removed ${count} Sefaria link${count === 1 ? "" : "s"}`);
+      }
+    });
+    this.addCommand({
       id: "toggle-auto-run",
       name: "Toggle auto-run",
       callback: async () => {
