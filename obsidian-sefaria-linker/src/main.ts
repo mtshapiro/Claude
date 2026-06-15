@@ -6,16 +6,23 @@ import {
 	Setting,
 	TFile,
 } from "obsidian";
+import { expandShortforms, mapToOriginal } from "./expansions";
+
+// ── Settings ──────────────────────────────────────────────────────────────────
 
 interface SefariaLinkerSettings {
 	autoRun: boolean;
 	autoRunDelay: number;
+	enableShortformExpansion: boolean;
 }
 
 const DEFAULT_SETTINGS: SefariaLinkerSettings = {
 	autoRun: true,
 	autoRunDelay: 1500,
+	enableShortformExpansion: true,
 };
+
+// ── Sefaria API types ─────────────────────────────────────────────────────────
 
 interface RefResult {
 	startChar: number;
@@ -44,121 +51,31 @@ interface AsyncTaskResponse {
 	error?: string;
 }
 
-// ── Abbreviation expansion ────────────────────────────────────────────────────
-
-// Quote chars: ASCII double-quote, curly right double-quote, Hebrew gershayim
-const Q = `[""״]`;
-
-const ABBREVIATIONS: Array<[RegExp, string]> = [
-	// Talmud tractates
-	[new RegExp(`\\bA${Q}Z\\b`, "g"), "Avodah Zarah"],
-	[new RegExp(`\\bB${Q}K\\b`, "g"), "Bava Kamma"],
-	[new RegExp(`\\bB${Q}M\\b`, "g"), "Bava Metzia"],
-	[new RegExp(`\\bB${Q}B\\b`, "g"), "Bava Batra"],
-	[new RegExp(`\\bY${Q}T\\b`, "g"), "Beitza"],
-	[new RegExp(`\\bR${Q}H\\b`, "g"), "Rosh Hashanah"],
-	[new RegExp(`\\bM${Q}K\\b`, "g"), "Moed Katan"],
-	[new RegExp(`\\bK${Q}S\\b`, "g"), "Keritot"],
-	[new RegExp(`\\bS${Q}A\\b`, "g"), "Shulchan Aruch"],
-	// Shulchan Aruch sections
-	[new RegExp(`\\bY${Q}D\\b`, "g"), "Yoreh Deah"],
-	[new RegExp(`\\bO${Q}C\\b`, "g"), "Orach Chaim"],
-	[new RegExp(`\\bE${Q}H\\b`, "g"), "Even HaEzer"],
-	[new RegExp(`\\bC${Q}M\\b`, "g"), "Choshen Mishpat"],
-	[new RegExp(`\\bCh${Q}M\\b`, "g"), "Choshen Mishpat"],
-];
-
-interface Expansion {
-	expandedText: string;
-	/** For each char in expandedText: original start index of its source token */
-	toOrigStart: number[];
-	/** For each char in expandedText: original end index (exclusive) of its source token */
-	toOrigEnd: number[];
-}
-
-function expandAbbreviations(text: string): Expansion {
-	interface Rep {
-		start: number;
-		end: number;
-		expansion: string;
-	}
-
-	// Collect all matches
-	const reps: Rep[] = [];
-	for (const [pattern, expansion] of ABBREVIATIONS) {
-		const re = new RegExp(pattern.source, "g");
-		let m: RegExpExecArray | null;
-		while ((m = re.exec(text)) !== null) {
-			reps.push({ start: m.index, end: m.index + m[0].length, expansion });
-		}
-	}
-
-	// Sort by start position, remove overlaps
-	reps.sort((a, b) => a.start - b.start);
-	const filtered: Rep[] = [];
-	let lastEnd = 0;
-	for (const r of reps) {
-		if (r.start >= lastEnd) {
-			filtered.push(r);
-			lastEnd = r.end;
-		}
-	}
-
-	// Build expanded text + offset maps
-	let expandedText = "";
-	const toOrigStart: number[] = [];
-	const toOrigEnd: number[] = [];
-	let origPos = 0;
-	let repIdx = 0;
-
-	while (origPos < text.length) {
-		if (repIdx < filtered.length && origPos === filtered[repIdx].start) {
-			const rep = filtered[repIdx];
-			for (let j = 0; j < rep.expansion.length; j++) {
-				expandedText += rep.expansion[j];
-				toOrigStart.push(rep.start);
-				toOrigEnd.push(rep.end);
-			}
-			origPos = rep.end;
-			repIdx++;
-		} else {
-			expandedText += text[origPos];
-			toOrigStart.push(origPos);
-			toOrigEnd.push(origPos + 1);
-			origPos++;
-		}
-	}
-
-	return { expandedText, toOrigStart, toOrigEnd };
-}
-
-// ── Commentator / contextual reference handling ───────────────────────────────
+// ── Contextual reference handling ("the Tosfos there", "Rashi ibid") ─────────
 
 interface LinkedRef {
 	origStart: number;
 	origEnd: number;
-	ref: string; // Sefaria ref key, e.g. "Avodah Zarah.75b"
-	refUrl: string; // URL slug from refData
+	ref: string;
+	refUrl: string;
 }
 
-// Detects any capitalized word(s) before "there / ibid / ad loc"
-// e.g. "the Tosfos there", "Rashi ibid", "the Aruch HaShulchan there"
+// Matches any capitalized word(s) immediately before "there / ibid / ad loc"
 const CONTEXTUAL_RE =
 	/\b(?:the\s+)?([A-Z][a-zA-Z]*(?:\s+[A-Z][a-zA-Z]*){0,4})\s+(?:there|ibid\.?|ad\s+loc\.?)\b/g;
 
-// In-memory cache: "CommentatorName|||refUrl" → resolved full URL or null
+// Session-scoped cache: "Name|||refUrl" → resolved URL slug or null
 const commentaryCache = new Map<string, string | null>();
 
 async function resolveCommentaryUrl(
 	commentatorRaw: string,
 	baseRefUrl: string
 ): Promise<string | null> {
-	// Normalise: trim, collapse spaces
 	const name = commentatorRaw.trim().replace(/\s+/g, " ");
 	const cacheKey = `${name}|||${baseRefUrl}`;
 	if (commentaryCache.has(cacheKey)) return commentaryCache.get(cacheKey)!;
 
-	// Convert URL slug back to a human ref: "Avodah_Zarah.75b" → "Avodah Zarah 75b"
+	// "Avodah_Zarah.75b" → "Avodah Zarah 75b"
 	const baseRef = baseRefUrl.replace(/_/g, " ").replace(/\.(\d)/, " $1");
 	const candidateRef = `${name} on ${baseRef}`;
 
@@ -166,17 +83,9 @@ async function resolveCommentaryUrl(
 		const resp = await fetch(
 			`https://www.sefaria.org/api/texts/${encodeURIComponent(candidateRef)}?context=0&pad=0`
 		);
-		if (!resp.ok) {
-			commentaryCache.set(cacheKey, null);
-			return null;
-		}
+		if (!resp.ok) { commentaryCache.set(cacheKey, null); return null; }
 		const data = await resp.json();
-		// Sefaria returns {error: "..."} for unresolvable refs
-		if (data.error || !data.ref) {
-			commentaryCache.set(cacheKey, null);
-			return null;
-		}
-		// Use the url field Sefaria returns, or build from the ref
+		if (data.error || !data.ref) { commentaryCache.set(cacheKey, null); return null; }
 		const url: string = data.url ?? (data.ref as string).replace(/\s/g, "_");
 		commentaryCache.set(cacheKey, url);
 		return url;
@@ -186,10 +95,6 @@ async function resolveCommentaryUrl(
 	}
 }
 
-/**
- * Second pass: find "X there/ibid" patterns, verify against Sefaria,
- * and replace with commentary links.
- */
 async function resolveContextualRefs(
 	content: string,
 	linkedRefs: LinkedRef[],
@@ -197,7 +102,7 @@ async function resolveContextualRefs(
 ): Promise<{ content: string; count: number }> {
 	if (linkedRefs.length === 0) return { content, count: 0 };
 
-	const sorted = [...linkedRefs].sort((a, b) => a.origStart - b.origStart);
+	const sortedRefs = [...linkedRefs].sort((a, b) => a.origStart - b.origStart);
 
 	interface ContextualMatch {
 		start: number;
@@ -210,64 +115,41 @@ async function resolveContextualRefs(
 	CONTEXTUAL_RE.lastIndex = 0;
 	let m: RegExpExecArray | null;
 	while ((m = CONTEXTUAL_RE.exec(content)) !== null) {
-		// Skip if inside an existing Sefaria link
 		if (existingRanges.some(([s, e]) => rangesOverlap(m!.index, m!.index + m![0].length, s, e)))
 			continue;
-		matches.push({
-			start: m.index,
-			end: m.index + m[0].length,
-			fullMatch: m[0],
-			commentatorRaw: m[1],
-		});
+		matches.push({ start: m.index, end: m.index + m[0].length, fullMatch: m[0], commentatorRaw: m[1] });
 	}
-
 	if (matches.length === 0) return { content, count: 0 };
 
-	// Resolve all matches in parallel
 	const resolved = await Promise.all(
 		matches.map(async (match) => {
-			// Find the nearest preceding linked ref
 			let nearestRef: LinkedRef | null = null;
-			for (let i = sorted.length - 1; i >= 0; i--) {
-				if (sorted[i].origEnd <= match.start) {
-					nearestRef = sorted[i];
-					break;
-				}
+			for (let i = sortedRefs.length - 1; i >= 0; i--) {
+				if (sortedRefs[i].origEnd <= match.start) { nearestRef = sortedRefs[i]; break; }
 			}
 			if (!nearestRef) return null;
-
 			const url = await resolveCommentaryUrl(match.commentatorRaw, nearestRef.refUrl);
-			if (!url) return null;
-			return { match, url };
+			return url ? { match, url } : null;
 		})
 	);
 
-	// Apply replacements backwards
 	let result = content;
 	let count = 0;
-
 	const toApply = resolved
 		.filter((r): r is { match: ContextualMatch; url: string } => r !== null)
 		.sort((a, b) => b.match.start - a.match.start);
 
 	for (const { match, url } of toApply) {
 		const fullUrl = `https://www.sefaria.org/${url}`;
-		const replacement = `[${match.fullMatch}](${fullUrl})`;
-		result = result.slice(0, match.start) + replacement + result.slice(match.end);
+		result = result.slice(0, match.start) + `[${match.fullMatch}](${fullUrl})` + result.slice(match.end);
 		count++;
 	}
-
 	return { content: result, count };
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
-function rangesOverlap(
-	aStart: number,
-	aEnd: number,
-	bStart: number,
-	bEnd: number
-): boolean {
+function rangesOverlap(aStart: number, aEnd: number, bStart: number, bEnd: number): boolean {
 	return aStart < bEnd && bStart < aEnd;
 }
 
@@ -298,40 +180,39 @@ async function pollAsyncTask(taskId: string): Promise<AsyncTaskResponse> {
 
 // ── Core linking logic ────────────────────────────────────────────────────────
 
-async function linkCitations(app: App, file: TFile): Promise<void> {
+async function linkCitations(
+	app: App,
+	file: TFile,
+	settings: SefariaLinkerSettings
+): Promise<void> {
 	const content = await app.vault.read(file);
+	const existingRanges = getExistingSefariaLinkRanges(content);
 
-	// Expand abbreviations before sending to Sefaria
-	const { expandedText, toOrigStart, toOrigEnd } = expandAbbreviations(content);
+	// Expand shortforms for API submission, skipping existing links
+	const { expandedText, substitutions } = settings.enableShortformExpansion
+		? expandShortforms(content, existingRanges)
+		: { expandedText: content, substitutions: [] };
 
 	const submitResp = await fetch("https://www.sefaria.org/api/find-refs", {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({
-			text: { title: "", body: expandedText },
-			lang: "en",
-		}),
+		body: JSON.stringify({ text: { title: "", body: expandedText }, lang: "en" }),
 	});
-
 	if (submitResp.status !== 202) {
 		throw new Error(`Unexpected status from find-refs: ${submitResp.status}`);
 	}
 
 	const { task_id }: FindRefsResponse = await submitResp.json();
 	const taskResult = await pollAsyncTask(task_id);
-
 	if (!taskResult.result) throw new Error("Task succeeded but returned no result");
 
 	const { results, refData } = taskResult.result.body;
-
-	// Collect existing Sefaria link ranges so we don't double-link
-	const existingRanges = getExistingSefariaLinkRanges(content);
 
 	const processedRefs = new Set<string>();
 	const processedRanges: Array<[number, number]> = [];
 	const linkedRefs: LinkedRef[] = [];
 
-	// Sort descending so replacements don't shift positions
+	// Sort descending by startChar so in-place replacements don't shift positions
 	const sorted = (results ?? []).sort((a, b) => b.startChar - a.startChar);
 
 	let newContent = content;
@@ -340,34 +221,23 @@ async function linkCitations(app: App, file: TFile): Promise<void> {
 	for (const result of sorted) {
 		const ref = result.refs?.[0];
 		if (!ref) continue;
-
 		const refInfo = refData[ref];
 		if (!refInfo?.url) continue;
 		if (processedRefs.has(ref)) continue;
 
-		// Map expanded positions back to original text positions
-		const origStart = toOrigStart[result.startChar] ?? result.startChar;
-		const origEnd =
-			result.endChar > 0
-				? toOrigEnd[result.endChar - 1] ?? result.endChar
-				: result.endChar;
+		// Map expanded positions → original positions, recover label text
+		const { origStart, origEnd, label } = mapToOriginal(
+			result.startChar,
+			result.endChar,
+			substitutions,
+			content
+		);
 
-		if (
-			existingRanges.some(([s, e]) => rangesOverlap(origStart, origEnd, s, e))
-		)
-			continue;
-		if (
-			processedRanges.some(([s, e]) => rangesOverlap(origStart, origEnd, s, e))
-		)
-			continue;
+		if (existingRanges.some(([s, e]) => rangesOverlap(origStart, origEnd, s, e))) continue;
+		if (processedRanges.some(([s, e]) => rangesOverlap(origStart, origEnd, s, e))) continue;
 
-		// Use the original text slice as link text (preserves abbreviations as-is)
-		const originalText = newContent.slice(origStart, origEnd);
 		const url = `https://www.sefaria.org/${refInfo.url}`;
-		const replacement = `[${originalText}](${url})`;
-
-		newContent =
-			newContent.slice(0, origStart) + replacement + newContent.slice(origEnd);
+		newContent = newContent.slice(0, origStart) + `[${label}](${url})` + newContent.slice(origEnd);
 
 		processedRefs.add(ref);
 		processedRanges.push([origStart, origEnd]);
@@ -375,12 +245,8 @@ async function linkCitations(app: App, file: TFile): Promise<void> {
 		linkedCount++;
 	}
 
-	// Second pass: contextual references ("the tosfos there", "Rashi ibid", etc.)
-	// Re-collect existing ranges from the updated content
+	// Second pass: contextual refs ("the Tosfos there", "Rashi ibid", …)
 	const updatedExistingRanges = getExistingSefariaLinkRanges(newContent);
-	// Adjust linkedRefs positions: they used original content coords; after backwards
-	// replacements they are still valid as starting anchors for "nearest preceding ref"
-	// but we pass them relative to the original positions which still order correctly.
 	const { content: finalContent, count: contextualCount } = await resolveContextualRefs(
 		newContent,
 		linkedRefs,
@@ -388,11 +254,7 @@ async function linkCitations(app: App, file: TFile): Promise<void> {
 	);
 
 	const totalCount = linkedCount + contextualCount;
-
-	if (totalCount === 0) {
-		new Notice("No citations found");
-		return;
-	}
+	if (totalCount === 0) { new Notice("No citations found"); return; }
 
 	await app.vault.modify(file, finalContent);
 	new Notice(`Linked ${totalCount} citation${totalCount === 1 ? "" : "s"}`);
@@ -412,12 +274,9 @@ export default class SefariaLinkerPlugin extends Plugin {
 			name: "Link citations in current note",
 			callback: async () => {
 				const file = this.app.workspace.getActiveFile();
-				if (!file) {
-					new Notice("No active file");
-					return;
-				}
+				if (!file) { new Notice("No active file"); return; }
 				try {
-					await linkCitations(this.app, file);
+					await linkCitations(this.app, file, this.settings);
 				} catch (err) {
 					new Notice(`Sefaria Linker error: ${(err as Error).message}`);
 				}
@@ -430,9 +289,7 @@ export default class SefariaLinkerPlugin extends Plugin {
 			callback: async () => {
 				this.settings.autoRun = !this.settings.autoRun;
 				await this.saveSettings();
-				new Notice(
-					`Sefaria auto-run ${this.settings.autoRun ? "enabled" : "disabled"}`
-				);
+				new Notice(`Sefaria auto-run ${this.settings.autoRun ? "enabled" : "disabled"}`);
 			},
 		});
 
@@ -443,7 +300,7 @@ export default class SefariaLinkerPlugin extends Plugin {
 				this.autoRunTimer = window.setTimeout(async () => {
 					this.autoRunTimer = null;
 					try {
-						await linkCitations(this.app, file);
+						await linkCitations(this.app, file, this.settings);
 					} catch (err) {
 						new Notice(`Sefaria Linker error: ${(err as Error).message}`);
 					}
@@ -486,19 +343,15 @@ class SefariaLinkerSettingTab extends PluginSettingTab {
 			.setName("Auto-run on file open")
 			.setDesc("Automatically detect and link citations when a note is opened.")
 			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.autoRun)
-					.onChange(async (value) => {
-						this.plugin.settings.autoRun = value;
-						await this.plugin.saveSettings();
-					})
+				toggle.setValue(this.plugin.settings.autoRun).onChange(async (value) => {
+					this.plugin.settings.autoRun = value;
+					await this.plugin.saveSettings();
+				})
 			);
 
 		new Setting(containerEl)
 			.setName("Auto-run delay (ms)")
-			.setDesc(
-				"How long to wait after opening a file before running (milliseconds)."
-			)
+			.setDesc("How long to wait after opening a file before running (milliseconds).")
 			.addText((text) =>
 				text
 					.setPlaceholder("1500")
@@ -510,6 +363,20 @@ class SefariaLinkerSettingTab extends PluginSettingTab {
 							await this.plugin.saveSettings();
 						}
 					})
+			);
+
+		new Setting(containerEl)
+			.setName("Expand halachic shortforms before linking")
+			.setDesc(
+				"Expand abbreviations like Shach 120.5, Taz, B’’H, Sh’’A, A’’Z etc. " +
+				"before sending to Sefaria, so they can be detected and linked. " +
+				"The original shortform text is preserved as the link label."
+			)
+			.addToggle((toggle) =>
+				toggle.setValue(this.plugin.settings.enableShortformExpansion).onChange(async (value) => {
+					this.plugin.settings.enableShortformExpansion = value;
+					await this.plugin.saveSettings();
+				})
 			);
 	}
 }

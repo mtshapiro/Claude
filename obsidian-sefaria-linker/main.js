@@ -28,71 +28,224 @@ __export(main_exports, {
 });
 module.exports = __toCommonJS(main_exports);
 var import_obsidian = require("obsidian");
-var DEFAULT_SETTINGS = {
-  autoRun: true,
-  autoRunDelay: 1500
-};
-var Q = `[""\u05F4]`;
-var ABBREVIATIONS = [
-  // Talmud tractates
-  [new RegExp(`\\bA${Q}Z\\b`, "g"), "Avodah Zarah"],
-  [new RegExp(`\\bB${Q}K\\b`, "g"), "Bava Kamma"],
-  [new RegExp(`\\bB${Q}M\\b`, "g"), "Bava Metzia"],
-  [new RegExp(`\\bB${Q}B\\b`, "g"), "Bava Batra"],
-  [new RegExp(`\\bY${Q}T\\b`, "g"), "Beitza"],
-  [new RegExp(`\\bR${Q}H\\b`, "g"), "Rosh Hashanah"],
-  [new RegExp(`\\bM${Q}K\\b`, "g"), "Moed Katan"],
-  [new RegExp(`\\bK${Q}S\\b`, "g"), "Keritot"],
-  [new RegExp(`\\bS${Q}A\\b`, "g"), "Shulchan Aruch"],
-  // Shulchan Aruch sections
-  [new RegExp(`\\bY${Q}D\\b`, "g"), "Yoreh Deah"],
-  [new RegExp(`\\bO${Q}C\\b`, "g"), "Orach Chaim"],
-  [new RegExp(`\\bE${Q}H\\b`, "g"), "Even HaEzer"],
-  [new RegExp(`\\bC${Q}M\\b`, "g"), "Choshen Mishpat"],
-  [new RegExp(`\\bCh${Q}M\\b`, "g"), "Choshen Mishpat"]
+
+// src/expansions.ts
+var DP = `(?:''|[""\u05F4])`;
+var SHORTFORM_EXPANSIONS = [
+  // ── Shulchan Arukh + section override (most specific first) ─────────────
+  {
+    // Sh''A O"C 123.4  →  Shulchan Arukh, Orach Chayim 123:4
+    pattern: new RegExp(`\\bSh${DP}A\\s+O${DP}C\\s+(\\d+)\\.(\\d+)`, "g"),
+    replacement: "Shulchan Arukh, Orach Chayim $1:$2"
+  },
+  {
+    // Sh''A E"H 123.4  →  Shulchan Arukh, Even HaEzer 123:4
+    pattern: new RegExp(`\\bSh${DP}A\\s+E${DP}H\\s+(\\d+)\\.(\\d+)`, "g"),
+    replacement: "Shulchan Arukh, Even HaEzer $1:$2"
+  },
+  {
+    // Sh''A C"M 123.4  →  Shulchan Arukh, Choshen Mishpat 123:4
+    pattern: new RegExp(`\\bSh${DP}A\\s+C${DP}M\\s+(\\d+)\\.(\\d+)`, "g"),
+    replacement: "Shulchan Arukh, Choshen Mishpat $1:$2"
+  },
+  {
+    // Sh''A 123.4  (bare, defaults to Yoreh De'ah)
+    pattern: new RegExp(`\\bSh${DP}A\\s+(\\d+)\\.(\\d+)`, "g"),
+    replacement: "Shulchan Arukh, Yoreh De'ah $1:$2"
+  },
+  // ── Shulchan Arukh commentaries on Yoreh De'ah ──────────────────────────
+  {
+    pattern: /\bShach\s+(\d+)\.(\d+)/g,
+    replacement: "Siftei Kohen on Shulchan Arukh, Yoreh De'ah $1:$2"
+  },
+  {
+    pattern: /\bTaz\s+(\d+)\.(\d+)/g,
+    replacement: "Turei Zahav on Shulchan Arukh, Yoreh De'ah $1:$2"
+  },
+  {
+    // B''H  (Ba'er Hetev)
+    pattern: new RegExp(`\\bB${DP}H\\s+(\\d+)\\.(\\d+)`, "g"),
+    replacement: "Ba'er Hetev on Shulchan Arukh, Yoreh De'ah $1:$2"
+  },
+  {
+    // N''HaK  (Nekudot HaKesef)
+    pattern: new RegExp(`\\bN${DP}HaK\\s+(\\d+)\\.(\\d+)`, "g"),
+    replacement: "Nekudot HaKesef on Shulchan Arukh, Yoreh De'ah $1:$2"
+  },
+  {
+    // P''T  (Pischei Teshuva)
+    pattern: new RegExp(`\\bP${DP}T\\s+(\\d+)\\.(\\d+)`, "g"),
+    replacement: "Pischei Teshuva on Shulchan Arukh, Yoreh De'ah $1:$2"
+  },
+  {
+    // B''Y  (Beit Yosef)
+    pattern: new RegExp(`\\bB${DP}Y\\s+(\\d+)\\.(\\d+)`, "g"),
+    replacement: "Beit Yosef, Yoreh De'ah $1:$2"
+  },
+  {
+    // D''M  (Darkei Moshe)
+    pattern: new RegExp(`\\bD${DP}M\\s+(\\d+)\\.(\\d+)`, "g"),
+    replacement: "Darkei Moshe, Yoreh De'ah $1:$2"
+  },
+  // ── Tur ──────────────────────────────────────────────────────────────────
+  {
+    pattern: /\bTur\s+(\d+)\.(\d+)/g,
+    replacement: "Tur, Yoreh De'ah $1:$2"
+  },
+  // ── Rambam / Mishneh Torah ────────────────────────────────────────────────
+  {
+    // M''A  (Mishneh Torah, Forbidden Foods)
+    pattern: new RegExp(`\\bM${DP}A\\s+(\\d+)\\.(\\d+)`, "g"),
+    replacement: "Mishneh Torah, Forbidden Foods $1:$2"
+  },
+  // ── Standalone Rishon works ───────────────────────────────────────────────
+  {
+    pattern: /\bIVHA\b/g,
+    replacement: "Issur VeHeter HaArokh"
+  },
+  {
+    pattern: /\bSmak\b/g,
+    replacement: "Sefer Mitzvot Katan"
+  },
+  {
+    pattern: /\bSmag\b/g,
+    replacement: "Sefer Mitzvot Gadol"
+  },
+  // ── Tractate abbreviations ────────────────────────────────────────────────
+  {
+    // A''Z  →  Avodah Zarah
+    pattern: new RegExp(`\\bA${DP}Z\\b`, "g"),
+    replacement: "Avodah Zarah"
+  },
+  // Existing single-quote abbreviations already handled by the old expansion
+  // are kept here so everything lives in one place:
+  {
+    pattern: new RegExp(`\\bB${DP}K\\b`, "g"),
+    replacement: "Bava Kamma"
+  },
+  {
+    pattern: new RegExp(`\\bB${DP}M\\b`, "g"),
+    replacement: "Bava Metzia"
+  },
+  {
+    pattern: new RegExp(`\\bB${DP}B\\b`, "g"),
+    replacement: "Bava Batra"
+  },
+  {
+    pattern: new RegExp(`\\bY${DP}T\\b`, "g"),
+    replacement: "Beitza"
+  },
+  {
+    pattern: new RegExp(`\\bR${DP}H\\b`, "g"),
+    replacement: "Rosh Hashanah"
+  },
+  {
+    pattern: new RegExp(`\\bM${DP}K\\b`, "g"),
+    replacement: "Moed Katan"
+  },
+  // Shulchan Arukh section shorthands (standalone, no siman number)
+  {
+    pattern: new RegExp(`\\bY${DP}D\\b`, "g"),
+    replacement: "Yoreh Deah"
+  },
+  {
+    pattern: new RegExp(`\\bO${DP}C\\b`, "g"),
+    replacement: "Orach Chaim"
+  },
+  {
+    pattern: new RegExp(`\\bE${DP}H\\b`, "g"),
+    replacement: "Even HaEzer"
+  },
+  {
+    pattern: new RegExp(`\\bC${DP}M\\b`, "g"),
+    replacement: "Choshen Mishpat"
+  }
 ];
-function expandAbbreviations(text) {
-  const reps = [];
-  for (const [pattern, expansion] of ABBREVIATIONS) {
-    const re = new RegExp(pattern.source, "g");
+function expandShortforms(text, skipRanges = []) {
+  const rawMatches = [];
+  for (const entry of SHORTFORM_EXPANSIONS) {
+    const re = new RegExp(entry.pattern.source, "g");
     let m;
     while ((m = re.exec(text)) !== null) {
-      reps.push({ start: m.index, end: m.index + m[0].length, expansion });
+      const matchStart = m.index;
+      const matchEnd = m.index + m[0].length;
+      if (skipRanges.some(([s, e]) => matchStart < e && s < matchEnd))
+        continue;
+      const expanded = entry.replacement.replace(
+        /\$(\d+)/g,
+        (_, n) => {
+          var _a;
+          return (_a = m[parseInt(n, 10)]) != null ? _a : "";
+        }
+      );
+      rawMatches.push({
+        start: matchStart,
+        end: matchEnd,
+        origText: m[0],
+        expandedText: expanded
+      });
     }
   }
-  reps.sort((a, b) => a.start - b.start);
+  rawMatches.sort((a, b) => a.start - b.start);
   const filtered = [];
   let lastEnd = 0;
-  for (const r of reps) {
+  for (const r of rawMatches) {
     if (r.start >= lastEnd) {
       filtered.push(r);
       lastEnd = r.end;
     }
   }
   let expandedText = "";
-  const toOrigStart = [];
-  const toOrigEnd = [];
+  const substitutions = [];
   let origPos = 0;
-  let repIdx = 0;
-  while (origPos < text.length) {
-    if (repIdx < filtered.length && origPos === filtered[repIdx].start) {
-      const rep = filtered[repIdx];
-      for (let j = 0; j < rep.expansion.length; j++) {
-        expandedText += rep.expansion[j];
-        toOrigStart.push(rep.start);
-        toOrigEnd.push(rep.end);
-      }
-      origPos = rep.end;
-      repIdx++;
-    } else {
-      expandedText += text[origPos];
-      toOrigStart.push(origPos);
-      toOrigEnd.push(origPos + 1);
-      origPos++;
+  for (const match of filtered) {
+    expandedText += text.slice(origPos, match.start);
+    const expandedStart = expandedText.length;
+    expandedText += match.expandedText;
+    const expandedEnd = expandedText.length;
+    substitutions.push({
+      origStart: match.start,
+      origEnd: match.end,
+      expandedStart,
+      expandedEnd,
+      origText: match.origText
+    });
+    origPos = match.end;
+  }
+  expandedText += text.slice(origPos);
+  return { expandedText, substitutions };
+}
+function mapToOriginal(expandedStart, expandedEnd, substitutions, origText) {
+  for (const sub of substitutions) {
+    if (expandedStart >= sub.expandedStart && expandedEnd <= sub.expandedEnd) {
+      return {
+        origStart: sub.origStart,
+        origEnd: sub.origEnd,
+        label: sub.origText
+      };
     }
   }
-  return { expandedText, toOrigStart, toOrigEnd };
+  let delta = 0;
+  for (const sub of substitutions) {
+    if (sub.expandedEnd <= expandedStart) {
+      delta += sub.origEnd - sub.origStart - (sub.expandedEnd - sub.expandedStart);
+    }
+  }
+  const origStart = expandedStart + delta;
+  const origEnd = expandedEnd + delta;
+  return {
+    origStart,
+    origEnd,
+    label: origText.slice(origStart, origEnd)
+  };
 }
+
+// src/main.ts
+var DEFAULT_SETTINGS = {
+  autoRun: true,
+  autoRunDelay: 1500,
+  enableShortformExpansion: true
+};
 var CONTEXTUAL_RE = /\b(?:the\s+)?([A-Z][a-zA-Z]*(?:\s+[A-Z][a-zA-Z]*){0,4})\s+(?:there|ibid\.?|ad\s+loc\.?)\b/g;
 var commentaryCache = /* @__PURE__ */ new Map();
 async function resolveCommentaryUrl(commentatorRaw, baseRefUrl) {
@@ -127,37 +280,30 @@ async function resolveCommentaryUrl(commentatorRaw, baseRefUrl) {
 async function resolveContextualRefs(content, linkedRefs, existingRanges) {
   if (linkedRefs.length === 0)
     return { content, count: 0 };
-  const sorted = [...linkedRefs].sort((a, b) => a.origStart - b.origStart);
+  const sortedRefs = [...linkedRefs].sort((a, b) => a.origStart - b.origStart);
   const matches = [];
   CONTEXTUAL_RE.lastIndex = 0;
   let m;
   while ((m = CONTEXTUAL_RE.exec(content)) !== null) {
     if (existingRanges.some(([s, e]) => rangesOverlap(m.index, m.index + m[0].length, s, e)))
       continue;
-    matches.push({
-      start: m.index,
-      end: m.index + m[0].length,
-      fullMatch: m[0],
-      commentatorRaw: m[1]
-    });
+    matches.push({ start: m.index, end: m.index + m[0].length, fullMatch: m[0], commentatorRaw: m[1] });
   }
   if (matches.length === 0)
     return { content, count: 0 };
   const resolved = await Promise.all(
     matches.map(async (match) => {
       let nearestRef = null;
-      for (let i = sorted.length - 1; i >= 0; i--) {
-        if (sorted[i].origEnd <= match.start) {
-          nearestRef = sorted[i];
+      for (let i = sortedRefs.length - 1; i >= 0; i--) {
+        if (sortedRefs[i].origEnd <= match.start) {
+          nearestRef = sortedRefs[i];
           break;
         }
       }
       if (!nearestRef)
         return null;
       const url = await resolveCommentaryUrl(match.commentatorRaw, nearestRef.refUrl);
-      if (!url)
-        return null;
-      return { match, url };
+      return url ? { match, url } : null;
     })
   );
   let result = content;
@@ -165,8 +311,7 @@ async function resolveContextualRefs(content, linkedRefs, existingRanges) {
   const toApply = resolved.filter((r) => r !== null).sort((a, b) => b.match.start - a.match.start);
   for (const { match, url } of toApply) {
     const fullUrl = `https://www.sefaria.org/${url}`;
-    const replacement = `[${match.fullMatch}](${fullUrl})`;
-    result = result.slice(0, match.start) + replacement + result.slice(match.end);
+    result = result.slice(0, match.start) + `[${match.fullMatch}](${fullUrl})` + result.slice(match.end);
     count++;
   }
   return { content: result, count };
@@ -199,17 +344,15 @@ async function pollAsyncTask(taskId) {
   }
   throw new Error("Timed out waiting for Sefaria response (30s)");
 }
-async function linkCitations(app, file) {
-  var _a, _b, _c;
+async function linkCitations(app, file, settings) {
+  var _a;
   const content = await app.vault.read(file);
-  const { expandedText, toOrigStart, toOrigEnd } = expandAbbreviations(content);
+  const existingRanges = getExistingSefariaLinkRanges(content);
+  const { expandedText, substitutions } = settings.enableShortformExpansion ? expandShortforms(content, existingRanges) : { expandedText: content, substitutions: [] };
   const submitResp = await fetch("https://www.sefaria.org/api/find-refs", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      text: { title: "", body: expandedText },
-      lang: "en"
-    })
+    body: JSON.stringify({ text: { title: "", body: expandedText }, lang: "en" })
   });
   if (submitResp.status !== 202) {
     throw new Error(`Unexpected status from find-refs: ${submitResp.status}`);
@@ -219,7 +362,6 @@ async function linkCitations(app, file) {
   if (!taskResult.result)
     throw new Error("Task succeeded but returned no result");
   const { results, refData } = taskResult.result.body;
-  const existingRanges = getExistingSefariaLinkRanges(content);
   const processedRefs = /* @__PURE__ */ new Set();
   const processedRanges = [];
   const linkedRefs = [];
@@ -235,16 +377,18 @@ async function linkCitations(app, file) {
       continue;
     if (processedRefs.has(ref))
       continue;
-    const origStart = (_b = toOrigStart[result.startChar]) != null ? _b : result.startChar;
-    const origEnd = result.endChar > 0 ? (_c = toOrigEnd[result.endChar - 1]) != null ? _c : result.endChar : result.endChar;
+    const { origStart, origEnd, label } = mapToOriginal(
+      result.startChar,
+      result.endChar,
+      substitutions,
+      content
+    );
     if (existingRanges.some(([s, e]) => rangesOverlap(origStart, origEnd, s, e)))
       continue;
     if (processedRanges.some(([s, e]) => rangesOverlap(origStart, origEnd, s, e)))
       continue;
-    const originalText = newContent.slice(origStart, origEnd);
     const url = `https://www.sefaria.org/${refInfo.url}`;
-    const replacement = `[${originalText}](${url})`;
-    newContent = newContent.slice(0, origStart) + replacement + newContent.slice(origEnd);
+    newContent = newContent.slice(0, origStart) + `[${label}](${url})` + newContent.slice(origEnd);
     processedRefs.add(ref);
     processedRanges.push([origStart, origEnd]);
     linkedRefs.push({ origStart, origEnd, ref, refUrl: refInfo.url });
@@ -281,7 +425,7 @@ var SefariaLinkerPlugin = class extends import_obsidian.Plugin {
           return;
         }
         try {
-          await linkCitations(this.app, file);
+          await linkCitations(this.app, file, this.settings);
         } catch (err) {
           new import_obsidian.Notice(`Sefaria Linker error: ${err.message}`);
         }
@@ -293,9 +437,7 @@ var SefariaLinkerPlugin = class extends import_obsidian.Plugin {
       callback: async () => {
         this.settings.autoRun = !this.settings.autoRun;
         await this.saveSettings();
-        new import_obsidian.Notice(
-          `Sefaria auto-run ${this.settings.autoRun ? "enabled" : "disabled"}`
-        );
+        new import_obsidian.Notice(`Sefaria auto-run ${this.settings.autoRun ? "enabled" : "disabled"}`);
       }
     });
     this.registerEvent(
@@ -307,7 +449,7 @@ var SefariaLinkerPlugin = class extends import_obsidian.Plugin {
         this.autoRunTimer = window.setTimeout(async () => {
           this.autoRunTimer = null;
           try {
-            await linkCitations(this.app, file);
+            await linkCitations(this.app, file, this.settings);
           } catch (err) {
             new import_obsidian.Notice(`Sefaria Linker error: ${err.message}`);
           }
@@ -342,15 +484,21 @@ var SefariaLinkerSettingTab = class extends import_obsidian.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian.Setting(containerEl).setName("Auto-run delay (ms)").setDesc(
-      "How long to wait after opening a file before running (milliseconds)."
-    ).addText(
+    new import_obsidian.Setting(containerEl).setName("Auto-run delay (ms)").setDesc("How long to wait after opening a file before running (milliseconds).").addText(
       (text) => text.setPlaceholder("1500").setValue(String(this.plugin.settings.autoRunDelay)).onChange(async (value) => {
         const parsed = parseInt(value, 10);
         if (!isNaN(parsed) && parsed >= 0) {
           this.plugin.settings.autoRunDelay = parsed;
           await this.plugin.saveSettings();
         }
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Expand halachic shortforms before linking").setDesc(
+      "Expand abbreviations like Shach 120.5, Taz, B\u2019\u2019H, Sh\u2019\u2019A, A\u2019\u2019Z etc. before sending to Sefaria, so they can be detected and linked. The original shortform text is preserved as the link label."
+    ).addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.enableShortformExpansion).onChange(async (value) => {
+        this.plugin.settings.enableShortformExpansion = value;
+        await this.plugin.saveSettings();
       })
     );
   }
