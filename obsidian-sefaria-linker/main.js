@@ -32,14 +32,141 @@ var DEFAULT_SETTINGS = {
   autoRun: true,
   autoRunDelay: 1500
 };
+var Q = `[""\u05F4]`;
+var ABBREVIATIONS = [
+  // Talmud tractates
+  [new RegExp(`\\bA${Q}Z\\b`, "g"), "Avodah Zarah"],
+  [new RegExp(`\\bB${Q}K\\b`, "g"), "Bava Kamma"],
+  [new RegExp(`\\bB${Q}M\\b`, "g"), "Bava Metzia"],
+  [new RegExp(`\\bB${Q}B\\b`, "g"), "Bava Batra"],
+  [new RegExp(`\\bY${Q}T\\b`, "g"), "Beitza"],
+  [new RegExp(`\\bR${Q}H\\b`, "g"), "Rosh Hashanah"],
+  [new RegExp(`\\bM${Q}K\\b`, "g"), "Moed Katan"],
+  [new RegExp(`\\bK${Q}S\\b`, "g"), "Keritot"],
+  [new RegExp(`\\bS${Q}A\\b`, "g"), "Shulchan Aruch"],
+  // Shulchan Aruch sections
+  [new RegExp(`\\bY${Q}D\\b`, "g"), "Yoreh Deah"],
+  [new RegExp(`\\bO${Q}C\\b`, "g"), "Orach Chaim"],
+  [new RegExp(`\\bE${Q}H\\b`, "g"), "Even HaEzer"],
+  [new RegExp(`\\bC${Q}M\\b`, "g"), "Choshen Mishpat"],
+  [new RegExp(`\\bCh${Q}M\\b`, "g"), "Choshen Mishpat"]
+];
+function expandAbbreviations(text) {
+  const reps = [];
+  for (const [pattern, expansion] of ABBREVIATIONS) {
+    const re = new RegExp(pattern.source, "g");
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      reps.push({ start: m.index, end: m.index + m[0].length, expansion });
+    }
+  }
+  reps.sort((a, b) => a.start - b.start);
+  const filtered = [];
+  let lastEnd = 0;
+  for (const r of reps) {
+    if (r.start >= lastEnd) {
+      filtered.push(r);
+      lastEnd = r.end;
+    }
+  }
+  let expandedText = "";
+  const toOrigStart = [];
+  const toOrigEnd = [];
+  let origPos = 0;
+  let repIdx = 0;
+  while (origPos < text.length) {
+    if (repIdx < filtered.length && origPos === filtered[repIdx].start) {
+      const rep = filtered[repIdx];
+      for (let j = 0; j < rep.expansion.length; j++) {
+        expandedText += rep.expansion[j];
+        toOrigStart.push(rep.start);
+        toOrigEnd.push(rep.end);
+      }
+      origPos = rep.end;
+      repIdx++;
+    } else {
+      expandedText += text[origPos];
+      toOrigStart.push(origPos);
+      toOrigEnd.push(origPos + 1);
+      origPos++;
+    }
+  }
+  return { expandedText, toOrigStart, toOrigEnd };
+}
+var COMMENTATOR_MAP = {
+  tosfos: "Tosafot",
+  tosafos: "Tosafot",
+  tosafot: "Tosafot",
+  rashi: "Rashi",
+  ramban: "Ramban",
+  rambam: "Rambam",
+  ran: "Ran",
+  ritva: "Ritva",
+  rashba: "Rashba",
+  meiri: "Meiri",
+  tur: "Tur",
+  "beit yosef": "Beit Yosef",
+  "beis yosef": "Beit Yosef",
+  "bet yosef": "Beit Yosef"
+};
+var COMMENTATOR_NAMES = Object.keys(COMMENTATOR_MAP).sort((a, b) => b.length - a.length).map((k) => k.replace(/\s+/g, "\\s+")).join("|");
+var CONTEXTUAL_RE = new RegExp(
+  `\\b(?:the\\s+)?(${COMMENTATOR_NAMES})\\s+(?:there|ibid\\.?|ad\\s+loc\\.?)\\b`,
+  "gi"
+);
+function commentaryUrl(commentator, refUrl) {
+  return `${commentator.replace(/\s+/g, "_")}_on_${refUrl}`;
+}
+function resolveContextualRefs(content, linkedRefs, existingRanges) {
+  if (linkedRefs.length === 0)
+    return { content, count: 0 };
+  const sorted = [...linkedRefs].sort((a, b) => a.origStart - b.origStart);
+  const matches = [];
+  CONTEXTUAL_RE.lastIndex = 0;
+  let m;
+  while ((m = CONTEXTUAL_RE.exec(content)) !== null) {
+    matches.push({
+      start: m.index,
+      end: m.index + m[0].length,
+      fullMatch: m[0],
+      commentatorRaw: m[1]
+    });
+  }
+  let result = content;
+  let count = 0;
+  for (const match of [...matches].sort((a, b) => b.start - a.start)) {
+    if (existingRanges.some(
+      ([s, e]) => rangesOverlap(match.start, match.end, s, e)
+    ))
+      continue;
+    let nearestRef = null;
+    for (let i = sorted.length - 1; i >= 0; i--) {
+      if (sorted[i].origEnd <= match.start) {
+        nearestRef = sorted[i];
+        break;
+      }
+    }
+    if (!nearestRef)
+      continue;
+    const canonical = COMMENTATOR_MAP[match.commentatorRaw.toLowerCase().replace(/\s+/g, " ")];
+    if (!canonical)
+      continue;
+    const url = commentaryUrl(canonical, nearestRef.refUrl);
+    const fullUrl = `https://www.sefaria.org/${url}`;
+    const replacement = `[${match.fullMatch}](${fullUrl})`;
+    result = result.slice(0, match.start) + replacement + result.slice(match.end);
+    count++;
+  }
+  return { content: result, count };
+}
 function rangesOverlap(aStart, aEnd, bStart, bEnd) {
   return aStart < bEnd && bStart < aEnd;
 }
 function getExistingSefariaLinkRanges(content) {
   const ranges = [];
-  const linkRegex = /\[([^\]]+)\]\(https:\/\/www\.sefaria\.org\/[^)]+\)/g;
+  const re = /\[([^\]]+)\]\(https:\/\/www\.sefaria\.org\/[^)]+\)/g;
   let match;
-  while ((match = linkRegex.exec(content)) !== null) {
+  while ((match = re.exec(content)) !== null) {
     ranges.push([match.index, match.index + match[0].length]);
   }
   return ranges;
@@ -49,30 +176,26 @@ async function pollAsyncTask(taskId) {
   const maxAttempts = 30;
   for (let i = 0; i < maxAttempts; i++) {
     await new Promise((resolve) => setTimeout(resolve, 1e3));
-    const resp = await fetch(
-      `https://www.sefaria.org/api/async/${taskId}`
-    );
-    if (!resp.ok) {
+    const resp = await fetch(`https://www.sefaria.org/api/async/${taskId}`);
+    if (!resp.ok)
       throw new Error(`Polling failed with status ${resp.status}`);
-    }
     const data = await resp.json();
-    if (data.state === "SUCCESS") {
+    if (data.state === "SUCCESS")
       return data;
-    }
-    if (data.state === "FAILURE") {
+    if (data.state === "FAILURE")
       throw new Error((_a = data.error) != null ? _a : "Task failed");
-    }
   }
   throw new Error("Timed out waiting for Sefaria response (30s)");
 }
 async function linkCitations(app, file) {
-  var _a;
+  var _a, _b, _c;
   const content = await app.vault.read(file);
+  const { expandedText, toOrigStart, toOrigEnd } = expandAbbreviations(content);
   const submitResp = await fetch("https://www.sefaria.org/api/find-refs", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      text: { title: "", body: content },
+      text: { title: "", body: expandedText },
       lang: "en"
     })
   });
@@ -81,18 +204,14 @@ async function linkCitations(app, file) {
   }
   const { task_id } = await submitResp.json();
   const taskResult = await pollAsyncTask(task_id);
-  if (!taskResult.result) {
+  if (!taskResult.result)
     throw new Error("Task succeeded but returned no result");
-  }
   const { results, refData } = taskResult.result.body;
-  if (!results || results.length === 0) {
-    new import_obsidian.Notice("No citations found");
-    return;
-  }
   const existingRanges = getExistingSefariaLinkRanges(content);
   const processedRefs = /* @__PURE__ */ new Set();
   const processedRanges = [];
-  const sorted = [...results].sort((a, b) => b.startChar - a.startChar);
+  const linkedRefs = [];
+  const sorted = (results != null ? results : []).sort((a, b) => b.startChar - a.startChar);
   let newContent = content;
   let linkedCount = 0;
   for (const result of sorted) {
@@ -104,30 +223,34 @@ async function linkCitations(app, file) {
       continue;
     if (processedRefs.has(ref))
       continue;
-    const { startChar, endChar, text } = result;
-    const overlapsExisting = existingRanges.some(
-      ([s, e]) => rangesOverlap(startChar, endChar, s, e)
-    );
-    if (overlapsExisting)
+    const origStart = (_b = toOrigStart[result.startChar]) != null ? _b : result.startChar;
+    const origEnd = result.endChar > 0 ? (_c = toOrigEnd[result.endChar - 1]) != null ? _c : result.endChar : result.endChar;
+    if (existingRanges.some(([s, e]) => rangesOverlap(origStart, origEnd, s, e)))
       continue;
-    const overlapsProcessed = processedRanges.some(
-      ([s, e]) => rangesOverlap(startChar, endChar, s, e)
-    );
-    if (overlapsProcessed)
+    if (processedRanges.some(([s, e]) => rangesOverlap(origStart, origEnd, s, e)))
       continue;
+    const originalText = newContent.slice(origStart, origEnd);
     const url = `https://www.sefaria.org/${refInfo.url}`;
-    const replacement = `[${text}](${url})`;
-    newContent = newContent.slice(0, startChar) + replacement + newContent.slice(endChar);
+    const replacement = `[${originalText}](${url})`;
+    newContent = newContent.slice(0, origStart) + replacement + newContent.slice(origEnd);
     processedRefs.add(ref);
-    processedRanges.push([startChar, endChar]);
+    processedRanges.push([origStart, origEnd]);
+    linkedRefs.push({ origStart, origEnd, ref, refUrl: refInfo.url });
     linkedCount++;
   }
-  if (linkedCount === 0) {
+  const updatedExistingRanges = getExistingSefariaLinkRanges(newContent);
+  const { content: finalContent, count: contextualCount } = resolveContextualRefs(
+    newContent,
+    linkedRefs,
+    updatedExistingRanges
+  );
+  const totalCount = linkedCount + contextualCount;
+  if (totalCount === 0) {
     new import_obsidian.Notice("No citations found");
     return;
   }
-  await app.vault.modify(file, newContent);
-  new import_obsidian.Notice(`Linked ${linkedCount} citation${linkedCount === 1 ? "" : "s"}`);
+  await app.vault.modify(file, finalContent);
+  new import_obsidian.Notice(`Linked ${totalCount} citation${totalCount === 1 ? "" : "s"}`);
 }
 var SefariaLinkerPlugin = class extends import_obsidian.Plugin {
   constructor() {
@@ -167,17 +290,14 @@ var SefariaLinkerPlugin = class extends import_obsidian.Plugin {
       this.app.workspace.on("file-open", (file) => {
         if (!this.settings.autoRun || !file)
           return;
-        if (this.autoRunTimer !== null) {
+        if (this.autoRunTimer !== null)
           window.clearTimeout(this.autoRunTimer);
-        }
         this.autoRunTimer = window.setTimeout(async () => {
           this.autoRunTimer = null;
           try {
             await linkCitations(this.app, file);
           } catch (err) {
-            new import_obsidian.Notice(
-              `Sefaria Linker error: ${err.message}`
-            );
+            new import_obsidian.Notice(`Sefaria Linker error: ${err.message}`);
           }
         }, this.settings.autoRunDelay);
       })
@@ -185,9 +305,8 @@ var SefariaLinkerPlugin = class extends import_obsidian.Plugin {
     this.addSettingTab(new SefariaLinkerSettingTab(this.app, this));
   }
   onunload() {
-    if (this.autoRunTimer !== null) {
+    if (this.autoRunTimer !== null)
       window.clearTimeout(this.autoRunTimer);
-    }
   }
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
@@ -205,9 +324,7 @@ var SefariaLinkerSettingTab = class extends import_obsidian.PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     containerEl.createEl("h2", { text: "Sefaria Linker Settings" });
-    new import_obsidian.Setting(containerEl).setName("Auto-run on file open").setDesc(
-      "Automatically detect and link citations when a note is opened."
-    ).addToggle(
+    new import_obsidian.Setting(containerEl).setName("Auto-run on file open").setDesc("Automatically detect and link citations when a note is opened.").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.autoRun).onChange(async (value) => {
         this.plugin.settings.autoRun = value;
         await this.plugin.saveSettings();
