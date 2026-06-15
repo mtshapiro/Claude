@@ -17,7 +17,7 @@ interface SefariaLinkerSettings {
 }
 
 const DEFAULT_SETTINGS: SefariaLinkerSettings = {
-	autoRun: true,
+	autoRun: false,
 	autoRunDelay: 1500,
 	enableShortformExpansion: true,
 };
@@ -234,6 +234,10 @@ async function linkCitations(
 
 	const { results, refData } = taskResult.result.body;
 
+	// Protected ranges in EXPANDED text — used to reject API results that
+	// land inside any link syntax before we attempt position mapping.
+	const expandedProtectedRanges = getProtectedRanges(expandedText);
+
 	const processedRefs = new Set<string>();
 	const processedRanges: Array<[number, number]> = [];
 	const linkedRefs: LinkedRef[] = [];
@@ -251,6 +255,13 @@ async function linkCitations(
 		if (!refInfo?.url) continue;
 		if (processedRefs.has(ref)) continue;
 
+		// First gate: reject if the result lands inside a link in the EXPANDED text.
+		// This catches cases where wiki-links or markdown links survived expansion
+		// unchanged, and the API returned a hit for text inside their brackets.
+		if (expandedProtectedRanges.some(([s, e]) =>
+			rangesOverlap(result.startChar, result.endChar, s, e)
+		)) continue;
+
 		// Map expanded positions → original positions, recover label text
 		const { origStart, origEnd, label } = mapToOriginal(
 			result.startChar,
@@ -259,6 +270,7 @@ async function linkCitations(
 			content
 		);
 
+		// Second gate: reject if the mapped original range overlaps a protected range.
 		if (existingRanges.some(([s, e]) => rangesOverlap(origStart, origEnd, s, e))) continue;
 		if (processedRanges.some(([s, e]) => rangesOverlap(origStart, origEnd, s, e))) continue;
 
@@ -294,6 +306,17 @@ export default class SefariaLinkerPlugin extends Plugin {
 
 	async onload() {
 		await this.loadSettings();
+
+		// Ribbon button — click to run the linker on the current note
+		this.addRibbonIcon("link", "Link Sefaria citations", async () => {
+			const file = this.app.workspace.getActiveFile();
+			if (!file) { new Notice("No active file"); return; }
+			try {
+				await linkCitations(this.app, file, this.settings);
+			} catch (err) {
+				new Notice(`Sefaria Linker error: ${(err as Error).message}`);
+			}
+		});
 
 		this.addCommand({
 			id: "link-citations",

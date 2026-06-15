@@ -254,7 +254,7 @@ function mapToOriginal(expandedStart, expandedEnd, substitutions, origText) {
 
 // src/main.ts
 var DEFAULT_SETTINGS = {
-  autoRun: true,
+  autoRun: false,
   autoRunDelay: 1500,
   enableShortformExpansion: true
 };
@@ -379,6 +379,7 @@ async function linkCitations(app, file, settings) {
   if (!taskResult.result)
     throw new Error("Task succeeded but returned no result");
   const { results, refData } = taskResult.result.body;
+  const expandedProtectedRanges = getProtectedRanges(expandedText);
   const processedRefs = /* @__PURE__ */ new Set();
   const processedRanges = [];
   const linkedRefs = [];
@@ -393,6 +394,10 @@ async function linkCitations(app, file, settings) {
     if (!(refInfo == null ? void 0 : refInfo.url))
       continue;
     if (processedRefs.has(ref))
+      continue;
+    if (expandedProtectedRanges.some(
+      ([s, e]) => rangesOverlap(result.startChar, result.endChar, s, e)
+    ))
       continue;
     const { origStart, origEnd, label } = mapToOriginal(
       result.startChar,
@@ -432,6 +437,18 @@ var SefariaLinkerPlugin = class extends import_obsidian.Plugin {
   }
   async onload() {
     await this.loadSettings();
+    this.addRibbonIcon("link", "Link Sefaria citations", async () => {
+      const file = this.app.workspace.getActiveFile();
+      if (!file) {
+        new import_obsidian.Notice("No active file");
+        return;
+      }
+      try {
+        await linkCitations(this.app, file, this.settings);
+      } catch (err) {
+        new import_obsidian.Notice(`Sefaria Linker error: ${err.message}`);
+      }
+    });
     this.addCommand({
       id: "link-citations",
       name: "Link citations in current note",
