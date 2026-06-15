@@ -73,7 +73,7 @@ async function linkCitations(app, file) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       text: { title: "", body: content },
-      lang: "he"
+      lang: "en"
     })
   });
   if (submitResp.status !== 202) {

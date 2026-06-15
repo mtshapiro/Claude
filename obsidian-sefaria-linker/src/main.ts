@@ -93,7 +93,7 @@ async function linkCitations(app: App, file: TFile): Promise<void> {
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify({
 			text: { title: "", body: content },
-			lang: "he",
+			lang: "en",
 		}),
 	});
 
