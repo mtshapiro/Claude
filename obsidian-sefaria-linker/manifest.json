@@ -1,0 +1,11 @@
+{
+  "id": "obsidian-sefaria-linker",
+  "name": "Sefaria Linker",
+  "version": "1.0.0",
+  "minAppVersion": "0.15.0",
+  "description": "Automatically detects and links Jewish text citations to Sefaria.org",
+  "author": "obsidian-sefaria-linker",
+  "authorUrl": "",
+  "fundingUrl": "",
+  "isDesktopOnly": false
+}
