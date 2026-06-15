@@ -6,7 +6,7 @@ import {
 	Setting,
 	TFile,
 } from "obsidian";
-import { expandShortforms, mapToOriginal } from "./expansions";
+import { expandShortforms, expandPageRanges, mapToOriginal } from "./expansions";
 
 // ── Settings ──────────────────────────────────────────────────────────────────
 
@@ -153,13 +153,30 @@ function rangesOverlap(aStart: number, aEnd: number, bStart: number, bEnd: numbe
 	return aStart < bEnd && bStart < aEnd;
 }
 
-function getExistingSefariaLinkRanges(content: string): Array<[number, number]> {
+/**
+ * Returns ranges of ALL link-like constructs that must not be touched:
+ *   - Standard markdown links:  [text](url)
+ *   - Obsidian wiki links:      [[target]]  or  [[target|alias]]
+ *
+ * Protecting all links (not just Sefaria ones) prevents the plugin from
+ * wrapping already-linked text in a second layer of brackets.
+ */
+function getProtectedRanges(content: string): Array<[number, number]> {
 	const ranges: Array<[number, number]> = [];
-	const re = /\[([^\]]+)\]\(https:\/\/www\.sefaria\.org\/[^)]+\)/g;
-	let match: RegExpExecArray | null;
-	while ((match = re.exec(content)) !== null) {
-		ranges.push([match.index, match.index + match[0].length]);
+	let m: RegExpExecArray | null;
+
+	// Standard markdown links [text](url)
+	const mdRe = /\[([^\]]*)\]\([^)]*\)/g;
+	while ((m = mdRe.exec(content)) !== null) {
+		ranges.push([m.index, m.index + m[0].length]);
 	}
+
+	// Obsidian wiki links [[...]] and [[...|alias]]
+	const wikiRe = /\[\[([^\]]*)\]\]/g;
+	while ((m = wikiRe.exec(content)) !== null) {
+		ranges.push([m.index, m.index + m[0].length]);
+	}
+
 	return ranges;
 }
 
@@ -186,12 +203,21 @@ async function linkCitations(
 	settings: SefariaLinkerSettings
 ): Promise<void> {
 	const content = await app.vault.read(file);
-	const existingRanges = getExistingSefariaLinkRanges(content);
+	const existingRanges = getProtectedRanges(content);
 
 	// Expand shortforms for API submission, skipping existing links
-	const { expandedText, substitutions } = settings.enableShortformExpansion
+	const { expandedText: shortformExpanded, substitutions } = settings.enableShortformExpansion
 		? expandShortforms(content, existingRanges)
 		: { expandedText: content, substitutions: [] };
+
+	// Expand compressed page ranges ("108-9" → "108-109") on the already-expanded text.
+	// This is a pure string transform with no position side-effects because
+	// expandPageRanges only ever lengthens a range, and mapToOriginal handles
+	// the length delta via the substitutions array (ranges that were already
+	// expanded by expandShortforms) plus direct offset for untouched text.
+	// Ranges that were NOT touched by expandShortforms remain 1-to-1 with the
+	// original, so expanding digits there produces a correct result position.
+	const expandedText = expandPageRanges(shortformExpanded);
 
 	const submitResp = await fetch("https://www.sefaria.org/api/find-refs", {
 		method: "POST",
@@ -246,7 +272,7 @@ async function linkCitations(
 	}
 
 	// Second pass: contextual refs ("the Tosfos there", "Rashi ibid", …)
-	const updatedExistingRanges = getExistingSefariaLinkRanges(newContent);
+	const updatedExistingRanges = getProtectedRanges(newContent);
 	const { content: finalContent, count: contextualCount } = await resolveContextualRefs(
 		newContent,
 		linkedRefs,

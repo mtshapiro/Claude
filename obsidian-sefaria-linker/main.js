@@ -215,6 +215,18 @@ function expandShortforms(text, skipRanges = []) {
   expandedText += text.slice(origPos);
   return { expandedText, substitutions };
 }
+function expandPageRanges(text) {
+  return text.replace(
+    /\b(\d+)([ab]?)-(\d+)([ab]?)\b/g,
+    (full, n1, s1, n2, s2) => {
+      if (n2.length < n1.length) {
+        const padded = n1.slice(0, n1.length - n2.length) + n2;
+        return `${n1}${s1}-${padded}${s2}`;
+      }
+      return full;
+    }
+  );
+}
 function mapToOriginal(expandedStart, expandedEnd, substitutions, origText) {
   for (const sub of substitutions) {
     if (expandedStart >= sub.expandedStart && expandedEnd <= sub.expandedEnd) {
@@ -319,12 +331,16 @@ async function resolveContextualRefs(content, linkedRefs, existingRanges) {
 function rangesOverlap(aStart, aEnd, bStart, bEnd) {
   return aStart < bEnd && bStart < aEnd;
 }
-function getExistingSefariaLinkRanges(content) {
+function getProtectedRanges(content) {
   const ranges = [];
-  const re = /\[([^\]]+)\]\(https:\/\/www\.sefaria\.org\/[^)]+\)/g;
-  let match;
-  while ((match = re.exec(content)) !== null) {
-    ranges.push([match.index, match.index + match[0].length]);
+  let m;
+  const mdRe = /\[([^\]]*)\]\([^)]*\)/g;
+  while ((m = mdRe.exec(content)) !== null) {
+    ranges.push([m.index, m.index + m[0].length]);
+  }
+  const wikiRe = /\[\[([^\]]*)\]\]/g;
+  while ((m = wikiRe.exec(content)) !== null) {
+    ranges.push([m.index, m.index + m[0].length]);
   }
   return ranges;
 }
@@ -347,8 +363,9 @@ async function pollAsyncTask(taskId) {
 async function linkCitations(app, file, settings) {
   var _a;
   const content = await app.vault.read(file);
-  const existingRanges = getExistingSefariaLinkRanges(content);
-  const { expandedText, substitutions } = settings.enableShortformExpansion ? expandShortforms(content, existingRanges) : { expandedText: content, substitutions: [] };
+  const existingRanges = getProtectedRanges(content);
+  const { expandedText: shortformExpanded, substitutions } = settings.enableShortformExpansion ? expandShortforms(content, existingRanges) : { expandedText: content, substitutions: [] };
+  const expandedText = expandPageRanges(shortformExpanded);
   const submitResp = await fetch("https://www.sefaria.org/api/find-refs", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -394,7 +411,7 @@ async function linkCitations(app, file, settings) {
     linkedRefs.push({ origStart, origEnd, ref, refUrl: refInfo.url });
     linkedCount++;
   }
-  const updatedExistingRanges = getExistingSefariaLinkRanges(newContent);
+  const updatedExistingRanges = getProtectedRanges(newContent);
   const { content: finalContent, count: contextualCount } = await resolveContextualRefs(
     newContent,
     linkedRefs,

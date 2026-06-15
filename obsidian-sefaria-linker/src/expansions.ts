@@ -268,6 +268,30 @@ export function expandShortforms(
 }
 
 /**
+ * Expand compressed Talmud page ranges so Sefaria can recognise them.
+ *
+ * Examples:
+ *   108-9     → 108-109      (single digit abbreviated)
+ *   96b-7a    → 96b-97a
+ *   111b-112a → unchanged    (second number already full length)
+ *
+ * Rule: if the second number has fewer digits than the first, prefix it
+ * with the leading digits of the first number.
+ */
+export function expandPageRanges(text: string): string {
+	return text.replace(
+		/\b(\d+)([ab]?)-(\d+)([ab]?)\b/g,
+		(full, n1: string, s1: string, n2: string, s2: string) => {
+			if (n2.length < n1.length) {
+				const padded = n1.slice(0, n1.length - n2.length) + n2;
+				return `${n1}${s1}-${padded}${s2}`;
+			}
+			return full;
+		}
+	);
+}
+
+/**
  * Map a character range in the expanded text back to the original text.
  *
  * If the range falls entirely within a substitution, returns the original
