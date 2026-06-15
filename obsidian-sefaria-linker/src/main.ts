@@ -263,7 +263,7 @@ async function linkCitations(
 		)) continue;
 
 		// Map expanded positions → original positions, recover label text
-		const { origStart, origEnd, label } = mapToOriginal(
+		const mapped = mapToOriginal(
 			result.startChar,
 			result.endChar,
 			substitutions,
@@ -271,8 +271,29 @@ async function linkCitations(
 		);
 
 		// Second gate: reject if the mapped original range overlaps a protected range.
-		if (existingRanges.some(([s, e]) => rangesOverlap(origStart, origEnd, s, e))) continue;
-		if (processedRanges.some(([s, e]) => rangesOverlap(origStart, origEnd, s, e))) continue;
+		if (existingRanges.some(([s, e]) => rangesOverlap(mapped.origStart, mapped.origEnd, s, e))) continue;
+		if (processedRanges.some(([s, e]) => rangesOverlap(mapped.origStart, mapped.origEnd, s, e))) continue;
+
+		// Narrow the replacement to the exact citation span.
+		// mapToOriginal may return a wider window (especially when the API's
+		// startChar/endChar span more than just the citation name).  For
+		// shortform substitutions the label is already the shortform text and
+		// the range is exact.  For plain-text matches, search for the API's
+		// citation text (result.text) within the mapped window so we don't
+		// accidentally include surrounding words ("says", "writes", etc.).
+		let { origStart, origEnd, label } = mapped;
+		const isSubstitution = substitutions.some(
+			s => s.origStart === origStart && s.origEnd === origEnd
+		);
+		if (!isSubstitution && result.text) {
+			const window = content.slice(origStart, origEnd);
+			const idx = window.toLowerCase().indexOf(result.text.toLowerCase());
+			if (idx !== -1 && idx + result.text.length <= window.length) {
+				origStart = origStart + idx;
+				origEnd = origStart + result.text.length;
+				label = content.slice(origStart, origEnd);
+			}
+		}
 
 		const url = `https://www.sefaria.org/${refInfo.url}`;
 		newContent = newContent.slice(0, origStart) + `[${label}](${url})` + newContent.slice(origEnd);

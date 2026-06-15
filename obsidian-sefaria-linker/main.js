@@ -399,16 +399,29 @@ async function linkCitations(app, file, settings) {
       ([s, e]) => rangesOverlap(result.startChar, result.endChar, s, e)
     ))
       continue;
-    const { origStart, origEnd, label } = mapToOriginal(
+    const mapped = mapToOriginal(
       result.startChar,
       result.endChar,
       substitutions,
       content
     );
-    if (existingRanges.some(([s, e]) => rangesOverlap(origStart, origEnd, s, e)))
+    if (existingRanges.some(([s, e]) => rangesOverlap(mapped.origStart, mapped.origEnd, s, e)))
       continue;
-    if (processedRanges.some(([s, e]) => rangesOverlap(origStart, origEnd, s, e)))
+    if (processedRanges.some(([s, e]) => rangesOverlap(mapped.origStart, mapped.origEnd, s, e)))
       continue;
+    let { origStart, origEnd, label } = mapped;
+    const isSubstitution = substitutions.some(
+      (s) => s.origStart === origStart && s.origEnd === origEnd
+    );
+    if (!isSubstitution && result.text) {
+      const window2 = content.slice(origStart, origEnd);
+      const idx = window2.toLowerCase().indexOf(result.text.toLowerCase());
+      if (idx !== -1 && idx + result.text.length <= window2.length) {
+        origStart = origStart + idx;
+        origEnd = origStart + result.text.length;
+        label = content.slice(origStart, origEnd);
+      }
+    }
     const url = `https://www.sefaria.org/${refInfo.url}`;
     newContent = newContent.slice(0, origStart) + `[${label}](${url})` + newContent.slice(origEnd);
     processedRefs.add(ref);
