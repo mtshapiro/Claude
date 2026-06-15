@@ -134,35 +134,6 @@ function expandAbbreviations(text: string): Expansion {
 
 // ── Commentator / contextual reference handling ───────────────────────────────
 
-// Maps lowercased user-written names → Sefaria canonical names
-const COMMENTATOR_MAP: Record<string, string> = {
-	tosfos: "Tosafot",
-	tosafos: "Tosafot",
-	tosafot: "Tosafot",
-	rashi: "Rashi",
-	ramban: "Ramban",
-	rambam: "Rambam",
-	ran: "Ran",
-	ritva: "Ritva",
-	rashba: "Rashba",
-	meiri: "Meiri",
-	tur: "Tur",
-	"beit yosef": "Beit Yosef",
-	"beis yosef": "Beit Yosef",
-	"bet yosef": "Beit Yosef",
-};
-
-// Matches e.g. "the tosfos there", "Rashi ibid", "the Ran ad loc"
-const COMMENTATOR_NAMES = Object.keys(COMMENTATOR_MAP)
-	.sort((a, b) => b.length - a.length) // longest first so multi-word matches win
-	.map((k) => k.replace(/\s+/g, "\\s+"))
-	.join("|");
-
-const CONTEXTUAL_RE = new RegExp(
-	`\\b(?:the\\s+)?(${COMMENTATOR_NAMES})\\s+(?:there|ibid\\.?|ad\\s+loc\\.?)\\b`,
-	"gi"
-);
-
 interface LinkedRef {
 	origStart: number;
 	origEnd: number;
@@ -170,27 +141,62 @@ interface LinkedRef {
 	refUrl: string; // URL slug from refData
 }
 
-/**
- * Build a Sefaria URL for a commentary on a base ref.
- * e.g. commentator="Tosafot", refUrl="Avodah_Zarah.75b"
- * → "Tosafot_on_Avodah_Zarah.75b"
- */
-function commentaryUrl(commentator: string, refUrl: string): string {
-	return `${commentator.replace(/\s+/g, "_")}_on_${refUrl}`;
+// Detects any capitalized word(s) before "there / ibid / ad loc"
+// e.g. "the Tosfos there", "Rashi ibid", "the Aruch HaShulchan there"
+const CONTEXTUAL_RE =
+	/\b(?:the\s+)?([A-Z][a-zA-Z]*(?:\s+[A-Z][a-zA-Z]*){0,4})\s+(?:there|ibid\.?|ad\s+loc\.?)\b/g;
+
+// In-memory cache: "CommentatorName|||refUrl" → resolved full URL or null
+const commentaryCache = new Map<string, string | null>();
+
+async function resolveCommentaryUrl(
+	commentatorRaw: string,
+	baseRefUrl: string
+): Promise<string | null> {
+	// Normalise: trim, collapse spaces
+	const name = commentatorRaw.trim().replace(/\s+/g, " ");
+	const cacheKey = `${name}|||${baseRefUrl}`;
+	if (commentaryCache.has(cacheKey)) return commentaryCache.get(cacheKey)!;
+
+	// Convert URL slug back to a human ref: "Avodah_Zarah.75b" → "Avodah Zarah 75b"
+	const baseRef = baseRefUrl.replace(/_/g, " ").replace(/\.(\d)/, " $1");
+	const candidateRef = `${name} on ${baseRef}`;
+
+	try {
+		const resp = await fetch(
+			`https://www.sefaria.org/api/texts/${encodeURIComponent(candidateRef)}?context=0&pad=0`
+		);
+		if (!resp.ok) {
+			commentaryCache.set(cacheKey, null);
+			return null;
+		}
+		const data = await resp.json();
+		// Sefaria returns {error: "..."} for unresolvable refs
+		if (data.error || !data.ref) {
+			commentaryCache.set(cacheKey, null);
+			return null;
+		}
+		// Use the url field Sefaria returns, or build from the ref
+		const url: string = data.url ?? (data.ref as string).replace(/\s/g, "_");
+		commentaryCache.set(cacheKey, url);
+		return url;
+	} catch {
+		commentaryCache.set(cacheKey, null);
+		return null;
+	}
 }
 
 /**
- * Given matched contextual spans, find the nearest preceding linked ref
- * and replace "X there/ibid" with a Sefaria commentary link.
+ * Second pass: find "X there/ibid" patterns, verify against Sefaria,
+ * and replace with commentary links.
  */
-function resolveContextualRefs(
+async function resolveContextualRefs(
 	content: string,
 	linkedRefs: LinkedRef[],
 	existingRanges: Array<[number, number]>
-): { content: string; count: number } {
+): Promise<{ content: string; count: number }> {
 	if (linkedRefs.length === 0) return { content, count: 0 };
 
-	// Sort linked refs ascending so we can binary-search
 	const sorted = [...linkedRefs].sort((a, b) => a.origStart - b.origStart);
 
 	interface ContextualMatch {
@@ -204,6 +210,9 @@ function resolveContextualRefs(
 	CONTEXTUAL_RE.lastIndex = 0;
 	let m: RegExpExecArray | null;
 	while ((m = CONTEXTUAL_RE.exec(content)) !== null) {
+		// Skip if inside an existing Sefaria link
+		if (existingRanges.some(([s, e]) => rangesOverlap(m!.index, m!.index + m![0].length, s, e)))
+			continue;
 		matches.push({
 			start: m.index,
 			end: m.index + m[0].length,
@@ -212,39 +221,39 @@ function resolveContextualRefs(
 		});
 	}
 
-	// Process backwards so replacements don't shift positions
+	if (matches.length === 0) return { content, count: 0 };
+
+	// Resolve all matches in parallel
+	const resolved = await Promise.all(
+		matches.map(async (match) => {
+			// Find the nearest preceding linked ref
+			let nearestRef: LinkedRef | null = null;
+			for (let i = sorted.length - 1; i >= 0; i--) {
+				if (sorted[i].origEnd <= match.start) {
+					nearestRef = sorted[i];
+					break;
+				}
+			}
+			if (!nearestRef) return null;
+
+			const url = await resolveCommentaryUrl(match.commentatorRaw, nearestRef.refUrl);
+			if (!url) return null;
+			return { match, url };
+		})
+	);
+
+	// Apply replacements backwards
 	let result = content;
 	let count = 0;
 
-	for (const match of [...matches].sort((a, b) => b.start - a.start)) {
-		// Skip if inside an existing Sefaria link
-		if (
-			existingRanges.some(([s, e]) =>
-				rangesOverlap(match.start, match.end, s, e)
-			)
-		)
-			continue;
+	const toApply = resolved
+		.filter((r): r is { match: ContextualMatch; url: string } => r !== null)
+		.sort((a, b) => b.match.start - a.match.start);
 
-		// Find the nearest preceding linked ref
-		let nearestRef: LinkedRef | null = null;
-		for (let i = sorted.length - 1; i >= 0; i--) {
-			if (sorted[i].origEnd <= match.start) {
-				nearestRef = sorted[i];
-				break;
-			}
-		}
-		if (!nearestRef) continue;
-
-		const canonical =
-			COMMENTATOR_MAP[match.commentatorRaw.toLowerCase().replace(/\s+/g, " ")];
-		if (!canonical) continue;
-
-		const url = commentaryUrl(canonical, nearestRef.refUrl);
+	for (const { match, url } of toApply) {
 		const fullUrl = `https://www.sefaria.org/${url}`;
 		const replacement = `[${match.fullMatch}](${fullUrl})`;
-
-		result =
-			result.slice(0, match.start) + replacement + result.slice(match.end);
+		result = result.slice(0, match.start) + replacement + result.slice(match.end);
 		count++;
 	}
 
@@ -372,7 +381,7 @@ async function linkCitations(app: App, file: TFile): Promise<void> {
 	// Adjust linkedRefs positions: they used original content coords; after backwards
 	// replacements they are still valid as starting anchors for "nearest preceding ref"
 	// but we pass them relative to the original positions which still order correctly.
-	const { content: finalContent, count: contextualCount } = resolveContextualRefs(
+	const { content: finalContent, count: contextualCount } = await resolveContextualRefs(
 		newContent,
 		linkedRefs,
 		updatedExistingRanges

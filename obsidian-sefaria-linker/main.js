@@ -93,31 +93,38 @@ function expandAbbreviations(text) {
   }
   return { expandedText, toOrigStart, toOrigEnd };
 }
-var COMMENTATOR_MAP = {
-  tosfos: "Tosafot",
-  tosafos: "Tosafot",
-  tosafot: "Tosafot",
-  rashi: "Rashi",
-  ramban: "Ramban",
-  rambam: "Rambam",
-  ran: "Ran",
-  ritva: "Ritva",
-  rashba: "Rashba",
-  meiri: "Meiri",
-  tur: "Tur",
-  "beit yosef": "Beit Yosef",
-  "beis yosef": "Beit Yosef",
-  "bet yosef": "Beit Yosef"
-};
-var COMMENTATOR_NAMES = Object.keys(COMMENTATOR_MAP).sort((a, b) => b.length - a.length).map((k) => k.replace(/\s+/g, "\\s+")).join("|");
-var CONTEXTUAL_RE = new RegExp(
-  `\\b(?:the\\s+)?(${COMMENTATOR_NAMES})\\s+(?:there|ibid\\.?|ad\\s+loc\\.?)\\b`,
-  "gi"
-);
-function commentaryUrl(commentator, refUrl) {
-  return `${commentator.replace(/\s+/g, "_")}_on_${refUrl}`;
+var CONTEXTUAL_RE = /\b(?:the\s+)?([A-Z][a-zA-Z]*(?:\s+[A-Z][a-zA-Z]*){0,4})\s+(?:there|ibid\.?|ad\s+loc\.?)\b/g;
+var commentaryCache = /* @__PURE__ */ new Map();
+async function resolveCommentaryUrl(commentatorRaw, baseRefUrl) {
+  var _a;
+  const name = commentatorRaw.trim().replace(/\s+/g, " ");
+  const cacheKey = `${name}|||${baseRefUrl}`;
+  if (commentaryCache.has(cacheKey))
+    return commentaryCache.get(cacheKey);
+  const baseRef = baseRefUrl.replace(/_/g, " ").replace(/\.(\d)/, " $1");
+  const candidateRef = `${name} on ${baseRef}`;
+  try {
+    const resp = await fetch(
+      `https://www.sefaria.org/api/texts/${encodeURIComponent(candidateRef)}?context=0&pad=0`
+    );
+    if (!resp.ok) {
+      commentaryCache.set(cacheKey, null);
+      return null;
+    }
+    const data = await resp.json();
+    if (data.error || !data.ref) {
+      commentaryCache.set(cacheKey, null);
+      return null;
+    }
+    const url = (_a = data.url) != null ? _a : data.ref.replace(/\s/g, "_");
+    commentaryCache.set(cacheKey, url);
+    return url;
+  } catch (e) {
+    commentaryCache.set(cacheKey, null);
+    return null;
+  }
 }
-function resolveContextualRefs(content, linkedRefs, existingRanges) {
+async function resolveContextualRefs(content, linkedRefs, existingRanges) {
   if (linkedRefs.length === 0)
     return { content, count: 0 };
   const sorted = [...linkedRefs].sort((a, b) => a.origStart - b.origStart);
@@ -125,6 +132,8 @@ function resolveContextualRefs(content, linkedRefs, existingRanges) {
   CONTEXTUAL_RE.lastIndex = 0;
   let m;
   while ((m = CONTEXTUAL_RE.exec(content)) !== null) {
+    if (existingRanges.some(([s, e]) => rangesOverlap(m.index, m.index + m[0].length, s, e)))
+      continue;
     matches.push({
       start: m.index,
       end: m.index + m[0].length,
@@ -132,26 +141,29 @@ function resolveContextualRefs(content, linkedRefs, existingRanges) {
       commentatorRaw: m[1]
     });
   }
+  if (matches.length === 0)
+    return { content, count: 0 };
+  const resolved = await Promise.all(
+    matches.map(async (match) => {
+      let nearestRef = null;
+      for (let i = sorted.length - 1; i >= 0; i--) {
+        if (sorted[i].origEnd <= match.start) {
+          nearestRef = sorted[i];
+          break;
+        }
+      }
+      if (!nearestRef)
+        return null;
+      const url = await resolveCommentaryUrl(match.commentatorRaw, nearestRef.refUrl);
+      if (!url)
+        return null;
+      return { match, url };
+    })
+  );
   let result = content;
   let count = 0;
-  for (const match of [...matches].sort((a, b) => b.start - a.start)) {
-    if (existingRanges.some(
-      ([s, e]) => rangesOverlap(match.start, match.end, s, e)
-    ))
-      continue;
-    let nearestRef = null;
-    for (let i = sorted.length - 1; i >= 0; i--) {
-      if (sorted[i].origEnd <= match.start) {
-        nearestRef = sorted[i];
-        break;
-      }
-    }
-    if (!nearestRef)
-      continue;
-    const canonical = COMMENTATOR_MAP[match.commentatorRaw.toLowerCase().replace(/\s+/g, " ")];
-    if (!canonical)
-      continue;
-    const url = commentaryUrl(canonical, nearestRef.refUrl);
+  const toApply = resolved.filter((r) => r !== null).sort((a, b) => b.match.start - a.match.start);
+  for (const { match, url } of toApply) {
     const fullUrl = `https://www.sefaria.org/${url}`;
     const replacement = `[${match.fullMatch}](${fullUrl})`;
     result = result.slice(0, match.start) + replacement + result.slice(match.end);
@@ -239,7 +251,7 @@ async function linkCitations(app, file) {
     linkedCount++;
   }
   const updatedExistingRanges = getExistingSefariaLinkRanges(newContent);
-  const { content: finalContent, count: contextualCount } = resolveContextualRefs(
+  const { content: finalContent, count: contextualCount } = await resolveContextualRefs(
     newContent,
     linkedRefs,
     updatedExistingRanges
