@@ -282,8 +282,13 @@ var SHORTFORM_EXPANSIONS = [
   // ════════════════════════════════════════════════════════════════════════════
   // "[Work] in/on Yoreh De'ah / Orach Chayim / …" → "[Work], [section]"
   // (space + preposition becomes a comma — Sefaria format: "Tur, Yoreh De'ah")
+  // These match the ORIGINAL shortforms (expansions don't cascade).
+  { pattern: new RegExp(`\\s+(?:in|on|al)\\s+Y${DP}D\\b`, "g"), replacement: ", Yoreh De'ah" },
+  { pattern: new RegExp(`\\s+(?:in|on|al)\\s+O${DP}C\\b`, "g"), replacement: ", Orach Chayim" },
+  { pattern: new RegExp(`\\s+(?:in|on|al)\\s+E${DP}H\\b`, "g"), replacement: ", Even HaEzer" },
+  { pattern: new RegExp(`\\s+(?:in|on|al)\\s+C${DP}M\\b`, "g"), replacement: ", Choshen Mishpat" },
+  // Also handle already-spelled-out section names after "in/on"
   { pattern: /\s+(?:in|on|al)\s+Yoreh\s+De['']?ah\b/gi, replacement: ", Yoreh De'ah" },
-  { pattern: /\s+(?:in|on|al)\s+Yoreh\s+Deah\b/gi, replacement: ", Yoreh De'ah" },
   { pattern: /\s+(?:in|on|al)\s+Orach\s+Chai[iy]m\b/gi, replacement: ", Orach Chayim" },
   { pattern: /\s+(?:in|on|al)\s+Even\s+HaEzer\b/gi, replacement: ", Even HaEzer" },
   { pattern: /\s+(?:in|on|al)\s+Choshen\s+Mishpat\b/gi, replacement: ", Choshen Mishpat" },
