@@ -234,8 +234,6 @@ async function linkCitations(
 
 	const { results, refData } = taskResult.result.body;
 
-	console.log("[SefariaLinker] API returned", results?.length ?? 0, "results:", JSON.stringify(results?.map(r => ({ text: r.text, refs: r.refs, start: r.startChar, end: r.endChar }))));
-
 	// Protected ranges in EXPANDED text — used to reject API results that
 	// land inside any link syntax before we attempt position mapping.
 	const expandedProtectedRanges = getProtectedRanges(expandedText);

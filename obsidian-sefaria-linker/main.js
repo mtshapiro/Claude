@@ -603,7 +603,7 @@ async function pollAsyncTask(taskId) {
   throw new Error("Timed out waiting for Sefaria response (30s)");
 }
 async function linkCitations(app, file, settings) {
-  var _a, _b;
+  var _a;
   const content = await app.vault.read(file);
   const existingRanges = getProtectedRanges(content);
   const { expandedText: shortformExpanded, substitutions } = settings.enableShortformExpansion ? expandShortforms(content, existingRanges) : { expandedText: content, substitutions: [] };
@@ -621,7 +621,6 @@ async function linkCitations(app, file, settings) {
   if (!taskResult.result)
     throw new Error("Task succeeded but returned no result");
   const { results, refData } = taskResult.result.body;
-  console.log("[SefariaLinker] API returned", (_a = results == null ? void 0 : results.length) != null ? _a : 0, "results:", JSON.stringify(results == null ? void 0 : results.map((r) => ({ text: r.text, refs: r.refs, start: r.startChar, end: r.endChar }))));
   const expandedProtectedRanges = getProtectedRanges(expandedText);
   const processedRefs = /* @__PURE__ */ new Set();
   const processedRanges = [];
@@ -630,7 +629,7 @@ async function linkCitations(app, file, settings) {
   let newContent = content;
   let linkedCount = 0;
   for (const result of sorted) {
-    const ref = (_b = result.refs) == null ? void 0 : _b[0];
+    const ref = (_a = result.refs) == null ? void 0 : _a[0];
     if (!ref)
       continue;
     const refInfo = refData[ref];
