@@ -284,17 +284,19 @@ var SHORTFORM_EXPANSIONS = [
   // Pattern: "[work] in/on/al [section/tractate]"
   // These fire AFTER section shorthands so the section is already expanded.
   // ════════════════════════════════════════════════════════════════════════════
-  // General rule: "[anything] in [Capitalized]" → "[anything] on [Capitalized]"
-  // Uses lookahead so the capital letter is NOT consumed — this lets Section 7
-  // shortform expansions (Y"D → Yoreh Deah etc.) still fire on that same position.
-  // SA section shorthands get a comma instead of "on" (Sefaria canonical format).
-  { pattern: new RegExp(`\\s+in\\s+(?=Y${DP}D)`, "g"), replacement: ", " },
-  { pattern: new RegExp(`\\s+in\\s+(?=O${DP}C)`, "g"), replacement: ", " },
-  { pattern: new RegExp(`\\s+in\\s+(?=E${DP}H)`, "g"), replacement: ", " },
-  { pattern: new RegExp(`\\s+in\\s+(?=C${DP}M)`, "g"), replacement: ", " },
-  // Everything else (tractates, Torah books, Hilchos X, etc.): "in" → "on"
-  // Require ≥3 chars ahead to avoid matching "in a", "in an", "in to" etc.
-  { pattern: /\s+in\s+(?=\w{3})/g, replacement: " on " },
+  // ── Preposition / location-phrase normalisation ───────────────────────────
+  // All of these mean "on [tractate/book]" in halachic citation context.
+  // SA section shorthands get a comma (Sefaria canonical: "Tur, Yoreh De'ah").
+  { pattern: new RegExp(`\\s+(?:in|on|al|at)\\s+(?=Y${DP}D)`, "g"), replacement: ", " },
+  { pattern: new RegExp(`\\s+(?:in|on|al|at)\\s+(?=O${DP}C)`, "g"), replacement: ", " },
+  { pattern: new RegExp(`\\s+(?:in|on|al|at)\\s+(?=E${DP}H)`, "g"), replacement: ", " },
+  { pattern: new RegExp(`\\s+(?:in|on|al|at)\\s+(?=C${DP}M)`, "g"), replacement: ", " },
+  // Strip verbose location phrases: "at the top of", "at the beginning of", etc.
+  { pattern: /\s+at\s+the\s+(?:top|bottom|beginning|start|end|head)\s+of\s+/g, replacement: " on " },
+  { pattern: /\s+(?:at\s+the\s+)?(?:beginning|start|end|top|bottom|head)\s+of\s+/g, replacement: " on " },
+  // General: any of these prepositions before a word of ≥3 chars → "on"
+  // Require ≥3 chars to avoid "in a", "at it", "on an" etc.
+  { pattern: /\s+(?:in|at|al)\s+(?=\w{3})/g, replacement: " on " },
   // ════════════════════════════════════════════════════════════════════════════
   // SECTION 14 — JERUSALEM TALMUD (YERUSHALMI)
   // "Yerushalmi" prefix → "Jerusalem Talmud" so API finds the right corpus.
@@ -419,7 +421,7 @@ var SHORTFORM_EXPANSIONS = [
 function expandShortforms(text, skipRanges = []) {
   const rawMatches = [];
   for (const entry of SHORTFORM_EXPANSIONS) {
-    const re = new RegExp(entry.pattern.source, "g");
+    const re = new RegExp(entry.pattern.source, "gi");
     let m;
     while ((m = re.exec(text)) !== null) {
       const matchStart = m.index;
