@@ -304,9 +304,15 @@ export const SHORTFORM_EXPANSIONS: ExpansionEntry[] = [
 	// ════════════════════════════════════════════════════════════════════════════
 
 	// General rule: "[anything] in [Capitalized]" → "[anything] on [Capitalized]"
-	// Handles "Tur in Y"D", "Rashi in Berakhot", "Ramban in Bereishis", etc.
-	// The leading space is consumed so offset tracking stays clean.
-	{ pattern: /\s+in\s+([A-Z])/g, replacement: " on $1" },
+	// Uses lookahead so the capital letter is NOT consumed — this lets Section 7
+	// shortform expansions (Y"D → Yoreh Deah etc.) still fire on that same position.
+	// SA section shorthands get a comma instead of "on" (Sefaria canonical format).
+	{ pattern: new RegExp(`\\s+in\\s+(?=Y${DP}D)`, "g"), replacement: ", " },
+	{ pattern: new RegExp(`\\s+in\\s+(?=O${DP}C)`, "g"), replacement: ", " },
+	{ pattern: new RegExp(`\\s+in\\s+(?=E${DP}H)`, "g"), replacement: ", " },
+	{ pattern: new RegExp(`\\s+in\\s+(?=C${DP}M)`, "g"), replacement: ", " },
+	// Everything else (tractates, Torah books, Hilchos X, etc.): "in" → "on"
+	{ pattern: /\s+in\s+(?=[A-Z])/g, replacement: " on " },
 
 	// ════════════════════════════════════════════════════════════════════════════
 	// SECTION 14 — JERUSALEM TALMUD (YERUSHALMI)
