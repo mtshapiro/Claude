@@ -69,6 +69,10 @@ var SHORTFORM_EXPANSIONS = [
   { pattern: /\bIVHA\b/g, replacement: "Issur VeHeter HaArokh" },
   { pattern: /\bSmak\b/g, replacement: "Sefer Mitzvot Katan" },
   { pattern: /\bSmag\b/g, replacement: "Sefer Mitzvot Gadol" },
+  // D"H / DH  (dibur hamaschil — strip the marker and the word(s) that follow
+  // up to the next citation keyword so the tractate/book ref remains clean)
+  { pattern: new RegExp(`\\bD${DP}H\\s+\\S+`, "g"), replacement: "" },
+  { pattern: /\bDH\s+\S+/g, replacement: "" },
   // ════════════════════════════════════════════════════════════════════════════
   // SECTION 6 — TALMUD TRACTATE ABBREVIATIONS (gershayim-style)
   // ════════════════════════════════════════════════════════════════════════════
@@ -168,84 +172,84 @@ var SHORTFORM_EXPANSIONS = [
   // Ashkenazi/Yiddish pronunciations that differ enough to confuse the API.
   // ════════════════════════════════════════════════════════════════════════════
   // Berakhot
-  { pattern: /\bBerachos\b/g, replacement: "Berakhot" },
-  { pattern: /\bBerachot\b/g, replacement: "Berakhot" },
-  { pattern: /\bBrachos\b/g, replacement: "Berakhot" },
-  { pattern: /\bBrachot\b/g, replacement: "Berakhot" },
+  { pattern: /\bBerachos\b/gi, replacement: "Berakhot" },
+  { pattern: /\bBerachot\b/gi, replacement: "Berakhot" },
+  { pattern: /\bBrachos\b/gi, replacement: "Berakhot" },
+  { pattern: /\bBrachot\b/gi, replacement: "Berakhot" },
   // Shabbat
-  { pattern: /\bShabbos\b/g, replacement: "Shabbat" },
+  { pattern: /\bShabbos\b/gi, replacement: "Shabbat" },
   // Eruvin/Eiruvin
-  { pattern: /\bEruvin\b/g, replacement: "Eiruvin" },
+  { pattern: /\bEruvin\b/gi, replacement: "Eiruvin" },
   // Pesachim
-  { pattern: /\bPsachim\b/g, replacement: "Pesachim" },
+  { pattern: /\bPsachim\b/gi, replacement: "Pesachim" },
   // Yoma
-  { pattern: /\bYuma\b/g, replacement: "Yoma" },
+  { pattern: /\bYuma\b/gi, replacement: "Yoma" },
   // Sukkah
-  { pattern: /\bSukka\b/g, replacement: "Sukkah" },
+  { pattern: /\bSukka\b/gi, replacement: "Sukkah" },
   // Beitzah
-  { pattern: /\bBeisa\b/g, replacement: "Beitzah" },
-  { pattern: /\bBeiza\b/g, replacement: "Beitzah" },
-  { pattern: /\bBeizah\b/g, replacement: "Beitzah" },
+  { pattern: /\bBeisa\b/gi, replacement: "Beitzah" },
+  { pattern: /\bBeiza\b/gi, replacement: "Beitzah" },
+  { pattern: /\bBeizah\b/gi, replacement: "Beitzah" },
   // Ta'anit
-  { pattern: /\bTaanis\b/g, replacement: "Ta'anit" },
-  { pattern: /\bTaanit\b/g, replacement: "Ta'anit" },
-  { pattern: /\bTa'anis\b/g, replacement: "Ta'anit" },
-  { pattern: /\bTaaniyos\b/g, replacement: "Ta'anit" },
+  { pattern: /\bTaanis\b/gi, replacement: "Ta'anit" },
+  { pattern: /\bTaanit\b/gi, replacement: "Ta'anit" },
+  { pattern: /\bTa'anis\b/gi, replacement: "Ta'anit" },
+  { pattern: /\bTaaniyos\b/gi, replacement: "Ta'anit" },
   // Megillah
-  { pattern: /\bMegila\b/g, replacement: "Megillah" },
+  { pattern: /\bMegila\b/gi, replacement: "Megillah" },
   // Chagigah
-  { pattern: /\bChagiga\b/g, replacement: "Chagigah" },
-  { pattern: /\bHagigah\b/g, replacement: "Chagigah" },
-  { pattern: /\bChagigos\b/g, replacement: "Chagigah" },
+  { pattern: /\bChagiga\b/gi, replacement: "Chagigah" },
+  { pattern: /\bHagigah\b/gi, replacement: "Chagigah" },
+  { pattern: /\bChagigos\b/gi, replacement: "Chagigah" },
   // Yevamot
-  { pattern: /\bYevamos\b/g, replacement: "Yevamot" },
-  { pattern: /\bYevamoth\b/g, replacement: "Yevamot" },
+  { pattern: /\bYevamos\b/gi, replacement: "Yevamot" },
+  { pattern: /\bYevamoth\b/gi, replacement: "Yevamot" },
   // Ketubot
-  { pattern: /\bKesuvos\b/g, replacement: "Ketubot" },
-  { pattern: /\bKesubos\b/g, replacement: "Ketubot" },
-  { pattern: /\bKetubos\b/g, replacement: "Ketubot" },
+  { pattern: /\bKesuvos\b/gi, replacement: "Ketubot" },
+  { pattern: /\bKesubos\b/gi, replacement: "Ketubot" },
+  { pattern: /\bKetubos\b/gi, replacement: "Ketubot" },
   // Sotah
-  { pattern: /\bSoto\b/g, replacement: "Sotah" },
+  { pattern: /\bSoto\b/gi, replacement: "Sotah" },
   // Gittin
-  { pattern: /\bGitin\b/g, replacement: "Gittin" },
+  { pattern: /\bGitin\b/gi, replacement: "Gittin" },
   // Kiddushin
-  { pattern: /\bKidushin\b/g, replacement: "Kiddushin" },
-  { pattern: /\bKidushim\b/g, replacement: "Kiddushin" },
+  { pattern: /\bKidushin\b/gi, replacement: "Kiddushin" },
+  { pattern: /\bKidushim\b/gi, replacement: "Kiddushin" },
   // Sanhedrin
-  { pattern: /\bSanhedrim\b/g, replacement: "Sanhedrin" },
+  { pattern: /\bSanhedrim\b/gi, replacement: "Sanhedrin" },
   // Makkot
-  { pattern: /\bMakkos\b/g, replacement: "Makkot" },
-  { pattern: /\bMakos\b/g, replacement: "Makkot" },
+  { pattern: /\bMakkos\b/gi, replacement: "Makkot" },
+  { pattern: /\bMakos\b/gi, replacement: "Makkot" },
   // Shevuot
-  { pattern: /\bShevuos\b/g, replacement: "Shevuot" },
-  { pattern: /\bShvuos\b/g, replacement: "Shevuot" },
-  { pattern: /\bShvuot\b/g, replacement: "Shevuot" },
+  { pattern: /\bShevuos\b/gi, replacement: "Shevuot" },
+  { pattern: /\bShvuos\b/gi, replacement: "Shevuot" },
+  { pattern: /\bShvuot\b/gi, replacement: "Shevuot" },
   // Horayot
-  { pattern: /\bHorayos\b/g, replacement: "Horayot" },
-  { pattern: /\bHoriyot\b/g, replacement: "Horayot" },
+  { pattern: /\bHorayos\b/gi, replacement: "Horayot" },
+  { pattern: /\bHoriyot\b/gi, replacement: "Horayot" },
   // Zevachim
-  { pattern: /\bZevahim\b/g, replacement: "Zevachim" },
+  { pattern: /\bZevahim\b/gi, replacement: "Zevachim" },
   // Menachot
-  { pattern: /\bMenachos\b/g, replacement: "Menachot" },
-  { pattern: /\bMenahos\b/g, replacement: "Menachot" },
-  { pattern: /\bMenahot\b/g, replacement: "Menachot" },
+  { pattern: /\bMenachos\b/gi, replacement: "Menachot" },
+  { pattern: /\bMenahos\b/gi, replacement: "Menachot" },
+  { pattern: /\bMenahot\b/gi, replacement: "Menachot" },
   // Chullin / Hullin
-  { pattern: /\bChullin\b/g, replacement: "Hullin" },
-  { pattern: /\bChulin\b/g, replacement: "Hullin" },
+  { pattern: /\bChullin\b/gi, replacement: "Hullin" },
+  { pattern: /\bChulin\b/gi, replacement: "Hullin" },
   // Bekhorot
-  { pattern: /\bBechorot\b/g, replacement: "Bekhorot" },
-  { pattern: /\bBechoros\b/g, replacement: "Bekhorot" },
-  { pattern: /\bBekoros\b/g, replacement: "Bekhorot" },
+  { pattern: /\bBechorot\b/gi, replacement: "Bekhorot" },
+  { pattern: /\bBechoros\b/gi, replacement: "Bekhorot" },
+  { pattern: /\bBekoros\b/gi, replacement: "Bekhorot" },
   // Arakhin
-  { pattern: /\bArachin\b/g, replacement: "Arakhin" },
-  { pattern: /\bArcin\b/g, replacement: "Arakhin" },
+  { pattern: /\bArachin\b/gi, replacement: "Arakhin" },
+  { pattern: /\bArcin\b/gi, replacement: "Arakhin" },
   // Keritot
-  { pattern: /\bKerisus\b/g, replacement: "Keritot" },
-  { pattern: /\bKerisos\b/g, replacement: "Keritot" },
+  { pattern: /\bKerisus\b/gi, replacement: "Keritot" },
+  { pattern: /\bKerisos\b/gi, replacement: "Keritot" },
   // Me'ilah
-  { pattern: /\bMeilah\b/g, replacement: "Me'ilah" },
+  { pattern: /\bMeilah\b/gi, replacement: "Me'ilah" },
   // Niddah
-  { pattern: /\bNidah\b/g, replacement: "Niddah" },
+  { pattern: /\bNidah\b/gi, replacement: "Niddah" },
   // ════════════════════════════════════════════════════════════════════════════
   // SECTION 12 — MISHNAH TRACTATES (Pirkei Avot alternate spellings)
   // ════════════════════════════════════════════════════════════════════════════
@@ -289,7 +293,8 @@ var SHORTFORM_EXPANSIONS = [
   { pattern: new RegExp(`\\s+in\\s+(?=E${DP}H)`, "g"), replacement: ", " },
   { pattern: new RegExp(`\\s+in\\s+(?=C${DP}M)`, "g"), replacement: ", " },
   // Everything else (tractates, Torah books, Hilchos X, etc.): "in" → "on"
-  { pattern: /\s+in\s+(?=[A-Z])/g, replacement: " on " },
+  // Require ≥3 chars ahead to avoid matching "in a", "in an", "in to" etc.
+  { pattern: /\s+in\s+(?=\w{3})/g, replacement: " on " },
   // ════════════════════════════════════════════════════════════════════════════
   // SECTION 14 — JERUSALEM TALMUD (YERUSHALMI)
   // "Yerushalmi" prefix → "Jerusalem Talmud" so API finds the right corpus.
@@ -311,9 +316,9 @@ var SHORTFORM_EXPANSIONS = [
   // Ashkenazi alternate spellings → Sefaria canonical names.
   // ════════════════════════════════════════════════════════════════════════════
   // Tosafot
-  { pattern: /\bTosfos\b/g, replacement: "Tosafot" },
-  { pattern: /\bTosafos\b/g, replacement: "Tosafot" },
-  { pattern: /\bTosfot\b/g, replacement: "Tosafot" },
+  { pattern: /\bTosfos\b/gi, replacement: "Tosafot" },
+  { pattern: /\bTosafos\b/gi, replacement: "Tosafot" },
+  { pattern: /\bTosfot\b/gi, replacement: "Tosafot" },
   // Rashi (usually fine, but cover alternate)
   { pattern: /\bRaschi\b/g, replacement: "Rashi" },
   // Rashba (Rashbo is an alternate abbreviation used in some texts)
