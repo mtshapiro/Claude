@@ -303,26 +303,10 @@ export const SHORTFORM_EXPANSIONS: ExpansionEntry[] = [
 	// These fire AFTER section shorthands so the section is already expanded.
 	// ════════════════════════════════════════════════════════════════════════════
 
-	// "[Work] in/on Yoreh De'ah / Orach Chayim / …" → "[Work], [section]"
-	// (space + preposition becomes a comma — Sefaria format: "Tur, Yoreh De'ah")
-	// These match the ORIGINAL shortforms (expansions don't cascade).
-	{ pattern: new RegExp(`\\s+(?:in|on|al)\\s+Y${DP}D\\b`, "g"),  replacement: ", Yoreh De'ah" },
-	{ pattern: new RegExp(`\\s+(?:in|on|al)\\s+O${DP}C\\b`, "g"),  replacement: ", Orach Chayim" },
-	{ pattern: new RegExp(`\\s+(?:in|on|al)\\s+E${DP}H\\b`, "g"),  replacement: ", Even HaEzer" },
-	{ pattern: new RegExp(`\\s+(?:in|on|al)\\s+C${DP}M\\b`, "g"),  replacement: ", Choshen Mishpat" },
-	// Also handle already-spelled-out section names after "in/on"
-	{ pattern: /\s+(?:in|on|al)\s+Yoreh\s+De['']?ah\b/gi,    replacement: ", Yoreh De'ah" },
-	{ pattern: /\s+(?:in|on|al)\s+Orach\s+Chai[iy]m\b/gi,    replacement: ", Orach Chayim" },
-	{ pattern: /\s+(?:in|on|al)\s+Even\s+HaEzer\b/gi,         replacement: ", Even HaEzer" },
-	{ pattern: /\s+(?:in|on|al)\s+Choshen\s+Mishpat\b/gi,     replacement: ", Choshen Mishpat" },
-
-	// "[Commentator] in [Tractate/Torah book]" → "[Commentator] on [...]"
-	// Covers Rashi in Berakhot, Tosfos in Chullin, Ramban in Bereishis, etc.
-	// Must come after tractate-spelling expansions so names are already canonical.
-	{
-		pattern: /\b(Rashi|Tosafot|Tosfos|Tosafos|Ramban|Rashba|Rashbam|Ran|Rosh|Ritva|Ritba|Meiri|Rif|Nimukei Yosef|Mordechai|Rashbo|Maggid Mishneh|Kessef Mishneh|Kesef Mishneh)\s+in\s+/g,
-		replacement: "$1 on "
-	},
+	// General rule: "[anything] in [Capitalized]" → "[anything] on [Capitalized]"
+	// Handles "Tur in Y"D", "Rashi in Berakhot", "Ramban in Bereishis", etc.
+	// The leading space is consumed so offset tracking stays clean.
+	{ pattern: /\s+in\s+([A-Z])/g, replacement: " on $1" },
 
 	// ════════════════════════════════════════════════════════════════════════════
 	// SECTION 14 — JERUSALEM TALMUD (YERUSHALMI)
