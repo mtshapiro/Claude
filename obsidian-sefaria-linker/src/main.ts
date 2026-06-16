@@ -274,18 +274,15 @@ async function linkCitations(
 		if (existingRanges.some(([s, e]) => rangesOverlap(mapped.origStart, mapped.origEnd, s, e))) continue;
 		if (processedRanges.some(([s, e]) => rangesOverlap(mapped.origStart, mapped.origEnd, s, e))) continue;
 
-		// Narrow the replacement to the exact citation span.
-		// mapToOriginal may return a wider window (especially when the API's
-		// startChar/endChar span more than just the citation name).  For
-		// shortform substitutions the label is already the shortform text and
-		// the range is exact.  For plain-text matches, search for the API's
-		// citation text (result.text) within the mapped window so we don't
-		// accidentally include surrounding words ("says", "writes", etc.).
+		// mapToOriginal handles substitution cases (including trimming parentheticals).
+		// For plain-text results (no substitution), also try to narrow to the
+		// exact citation span using result.text, to avoid including trailing
+		// words like "says" or "writes" that the API sometimes folds in.
+		// This search naturally no-ops for substitution results because result.text
+		// is in expanded vocabulary (e.g. "Numbers") and won't match the original
+		// shortform ("Bamidbar").
 		let { origStart, origEnd, label } = mapped;
-		const isSubstitution = substitutions.some(
-			s => s.origStart === origStart && s.origEnd === origEnd
-		);
-		if (!isSubstitution && result.text) {
+		if (result.text) {
 			const window = content.slice(origStart, origEnd);
 			const idx = window.toLowerCase().indexOf(result.text.toLowerCase());
 			if (idx !== -1 && idx + result.text.length <= window.length) {

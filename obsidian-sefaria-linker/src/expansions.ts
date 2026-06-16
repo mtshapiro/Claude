@@ -138,23 +138,29 @@ export const SHORTFORM_EXPANSIONS: ExpansionEntry[] = [
 		pattern: new RegExp(`\\bM${DP}K\\b`, "g"),
 		replacement: "Moed Katan",
 	},
-	// Shulchan Arukh section shorthands (standalone, no siman number)
-	{
-		pattern: new RegExp(`\\bY${DP}D\\b`, "g"),
-		replacement: "Yoreh Deah",
-	},
-	{
-		pattern: new RegExp(`\\bO${DP}C\\b`, "g"),
-		replacement: "Orach Chaim",
-	},
-	{
-		pattern: new RegExp(`\\bE${DP}H\\b`, "g"),
-		replacement: "Even HaEzer",
-	},
-	{
-		pattern: new RegExp(`\\bC${DP}M\\b`, "g"),
-		replacement: "Choshen Mishpat",
-	},
+	// ── Hebrew names for Tanakh books ────────────────────────────────────────
+	{ pattern: /\bBereishis\b/g, replacement: "Genesis" },
+	{ pattern: /\bBereishit\b/g, replacement: "Genesis" },
+	{ pattern: /\bShemos\b/g, replacement: "Exodus" },
+	{ pattern: /\bShemot\b/g, replacement: "Exodus" },
+	{ pattern: /\bVayikra\b/g, replacement: "Leviticus" },
+	{ pattern: /\bBamidbar\b/g, replacement: "Numbers" },
+	{ pattern: /\bDevarim\b/g, replacement: "Deuteronomy" },
+	{ pattern: /\bTehillim\b/g, replacement: "Psalms" },
+	{ pattern: /\bMishlei\b/g, replacement: "Proverbs" },
+	{ pattern: /\bKoheles\b/g, replacement: "Ecclesiastes" },
+	{ pattern: /\bKohelet\b/g, replacement: "Ecclesiastes" },
+	{ pattern: /\bIyov\b/g, replacement: "Job" },
+	{ pattern: /\bYeshaya\b/g, replacement: "Isaiah" },
+	{ pattern: /\bYirmiyahu\b/g, replacement: "Jeremiah" },
+	{ pattern: /\bYechezkel\b/g, replacement: "Ezekiel" },
+	{ pattern: /\bShir HaShirim\b/g, replacement: "Song of Songs" },
+	{ pattern: /\bEichah\b/g, replacement: "Lamentations" },
+	{ pattern: /\bRus\b/g, replacement: "Ruth" },
+	{ pattern: /\bYehoshua\b/g, replacement: "Joshua" },
+	{ pattern: /\bShoftim\b/g, replacement: "Judges" },
+	{ pattern: /\bZechariah\b/g, replacement: "Zechariah" },
+	{ pattern: /\bMalachi\b/g, replacement: "Malachi" },
 ];
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -294,12 +300,21 @@ export function expandPageRanges(text: string): string {
 /**
  * Map a character range in the expanded text back to the original text.
  *
- * If the range falls entirely within a substitution, returns the original
- * span and the original shortform as the link label.
+ * Three cases:
  *
- * If the range falls outside substitutions, applies the cumulative length
- * delta from all earlier substitutions to recover the original position, and
- * slices the label from `origText`.
+ * 1. Result starts WITHIN a substitution (e.g. "Sefer Mitzvot Katan 199"
+ *    where "Smak" was expanded to "Sefer Mitzvot Katan" but the API span
+ *    extends further into " 199" or "(199)"):
+ *    – origStart  = sub.origStart  (anchor to the shortform start)
+ *    – origEnd    = computed via delta so chapter/verse after the shortform
+ *                   is included (e.g. "Bamidbar 31:23" → keeps "31:23")
+ *    – trailing parentheticals like " (199)" are stripped from the label
+ *
+ * 2. Result falls entirely within a single substitution:
+ *    – return the substitution's original span and origText directly.
+ *
+ * 3. Result outside all substitutions:
+ *    – apply cumulative length-delta from prior substitutions.
  */
 export function mapToOriginal(
 	expandedStart: number,
@@ -307,29 +322,49 @@ export function mapToOriginal(
 	substitutions: SubstitutionRecord[],
 	origText: string
 ): { origStart: number; origEnd: number; label: string } {
-	// Check whether this result falls entirely within a single substitution
+
+	/** Cumulative orig-vs-expanded delta for all substitutions whose
+	 *  expanded span ends at or before `pos`. */
+	function deltaAt(pos: number): number {
+		let d = 0;
+		for (const s of substitutions) {
+			if (s.expandedEnd <= pos) {
+				d += (s.origEnd - s.origStart) - (s.expandedEnd - s.expandedStart);
+			}
+		}
+		return d;
+	}
+
+	// Case 1 & 2: result starts within a substitution
 	for (const sub of substitutions) {
-		if (expandedStart >= sub.expandedStart && expandedEnd <= sub.expandedEnd) {
+		if (expandedStart >= sub.expandedStart && expandedStart < sub.expandedEnd) {
+
+			// Case 2: result also ends within the same substitution
+			if (expandedEnd <= sub.expandedEnd) {
+				return { origStart: sub.origStart, origEnd: sub.origEnd, label: sub.origText };
+			}
+
+			// Case 1: result extends beyond the substitution (e.g. "Numbers 31:23"
+			// where "Numbers" came from "Bamidbar", but " 31:23" follows in original)
+			const origStart = sub.origStart;
+			const origEnd = expandedEnd + deltaAt(expandedEnd);
+
+			// Strip trailing parenthetical e.g. " (199)" so we don't include
+			// page-number annotations that aren't part of the citation text.
+			const raw = origText.slice(origStart, Math.max(origStart, origEnd));
+			const trimmed = raw.replace(/\s*\([^)]*\)\s*$/, "");
 			return {
-				origStart: sub.origStart,
-				origEnd: sub.origEnd,
-				label: sub.origText,
+				origStart,
+				origEnd: origStart + trimmed.length,
+				label: trimmed,
 			};
 		}
 	}
 
-	// Not inside a substitution — compute cumulative offset delta.
-	// delta = sum of (origLength - expandedLength) for all substitutions
-	// whose expanded range ends before expandedStart.
-	let delta = 0;
-	for (const sub of substitutions) {
-		if (sub.expandedEnd <= expandedStart) {
-			delta += (sub.origEnd - sub.origStart) - (sub.expandedEnd - sub.expandedStart);
-		}
-	}
-
-	const origStart = expandedStart + delta;
-	const origEnd = expandedEnd + delta;
+	// Case 3: outside all substitutions
+	const d = deltaAt(expandedStart);
+	const origStart = expandedStart + d;
+	const origEnd = expandedEnd + d;
 	return {
 		origStart,
 		origEnd,

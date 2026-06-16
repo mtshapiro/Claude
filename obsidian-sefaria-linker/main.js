@@ -143,23 +143,29 @@ var SHORTFORM_EXPANSIONS = [
     pattern: new RegExp(`\\bM${DP}K\\b`, "g"),
     replacement: "Moed Katan"
   },
-  // Shulchan Arukh section shorthands (standalone, no siman number)
-  {
-    pattern: new RegExp(`\\bY${DP}D\\b`, "g"),
-    replacement: "Yoreh Deah"
-  },
-  {
-    pattern: new RegExp(`\\bO${DP}C\\b`, "g"),
-    replacement: "Orach Chaim"
-  },
-  {
-    pattern: new RegExp(`\\bE${DP}H\\b`, "g"),
-    replacement: "Even HaEzer"
-  },
-  {
-    pattern: new RegExp(`\\bC${DP}M\\b`, "g"),
-    replacement: "Choshen Mishpat"
-  }
+  // ── Hebrew names for Tanakh books ────────────────────────────────────────
+  { pattern: /\bBereishis\b/g, replacement: "Genesis" },
+  { pattern: /\bBereishit\b/g, replacement: "Genesis" },
+  { pattern: /\bShemos\b/g, replacement: "Exodus" },
+  { pattern: /\bShemot\b/g, replacement: "Exodus" },
+  { pattern: /\bVayikra\b/g, replacement: "Leviticus" },
+  { pattern: /\bBamidbar\b/g, replacement: "Numbers" },
+  { pattern: /\bDevarim\b/g, replacement: "Deuteronomy" },
+  { pattern: /\bTehillim\b/g, replacement: "Psalms" },
+  { pattern: /\bMishlei\b/g, replacement: "Proverbs" },
+  { pattern: /\bKoheles\b/g, replacement: "Ecclesiastes" },
+  { pattern: /\bKohelet\b/g, replacement: "Ecclesiastes" },
+  { pattern: /\bIyov\b/g, replacement: "Job" },
+  { pattern: /\bYeshaya\b/g, replacement: "Isaiah" },
+  { pattern: /\bYirmiyahu\b/g, replacement: "Jeremiah" },
+  { pattern: /\bYechezkel\b/g, replacement: "Ezekiel" },
+  { pattern: /\bShir HaShirim\b/g, replacement: "Song of Songs" },
+  { pattern: /\bEichah\b/g, replacement: "Lamentations" },
+  { pattern: /\bRus\b/g, replacement: "Ruth" },
+  { pattern: /\bYehoshua\b/g, replacement: "Joshua" },
+  { pattern: /\bShoftim\b/g, replacement: "Judges" },
+  { pattern: /\bZechariah\b/g, replacement: "Zechariah" },
+  { pattern: /\bMalachi\b/g, replacement: "Malachi" }
 ];
 function expandShortforms(text, skipRanges = []) {
   const rawMatches = [];
@@ -228,23 +234,34 @@ function expandPageRanges(text) {
   );
 }
 function mapToOriginal(expandedStart, expandedEnd, substitutions, origText) {
+  function deltaAt(pos) {
+    let d2 = 0;
+    for (const s of substitutions) {
+      if (s.expandedEnd <= pos) {
+        d2 += s.origEnd - s.origStart - (s.expandedEnd - s.expandedStart);
+      }
+    }
+    return d2;
+  }
   for (const sub of substitutions) {
-    if (expandedStart >= sub.expandedStart && expandedEnd <= sub.expandedEnd) {
+    if (expandedStart >= sub.expandedStart && expandedStart < sub.expandedEnd) {
+      if (expandedEnd <= sub.expandedEnd) {
+        return { origStart: sub.origStart, origEnd: sub.origEnd, label: sub.origText };
+      }
+      const origStart2 = sub.origStart;
+      const origEnd2 = expandedEnd + deltaAt(expandedEnd);
+      const raw = origText.slice(origStart2, Math.max(origStart2, origEnd2));
+      const trimmed = raw.replace(/\s*\([^)]*\)\s*$/, "");
       return {
-        origStart: sub.origStart,
-        origEnd: sub.origEnd,
-        label: sub.origText
+        origStart: origStart2,
+        origEnd: origStart2 + trimmed.length,
+        label: trimmed
       };
     }
   }
-  let delta = 0;
-  for (const sub of substitutions) {
-    if (sub.expandedEnd <= expandedStart) {
-      delta += sub.origEnd - sub.origStart - (sub.expandedEnd - sub.expandedStart);
-    }
-  }
-  const origStart = expandedStart + delta;
-  const origEnd = expandedEnd + delta;
+  const d = deltaAt(expandedStart);
+  const origStart = expandedStart + d;
+  const origEnd = expandedEnd + d;
   return {
     origStart,
     origEnd,
@@ -410,10 +427,7 @@ async function linkCitations(app, file, settings) {
     if (processedRanges.some(([s, e]) => rangesOverlap(mapped.origStart, mapped.origEnd, s, e)))
       continue;
     let { origStart, origEnd, label } = mapped;
-    const isSubstitution = substitutions.some(
-      (s) => s.origStart === origStart && s.origEnd === origEnd
-    );
-    if (!isSubstitution && result.text) {
+    if (result.text) {
       const window2 = content.slice(origStart, origEnd);
       const idx = window2.toLowerCase().indexOf(result.text.toLowerCase());
       if (idx !== -1 && idx + result.text.length <= window2.length) {
