@@ -11,10 +11,11 @@
 
 // Matches the various ways a double-prime / gershayim can be written:
 //   ''  (two ASCII apostrophes)
-//   "   (ASCII double-quote)
+//   "   (ASCII double-quote U+0022)
+//   "   (Unicode left double-quote, U+201C)
 //   "   (Unicode right double-quote, U+201D)
 //   ״   (Hebrew gershayim, U+05F4)
-const DP = `(?:''|[""״])`;
+const DP = `(?:''|[""“”״])`;
 
 export interface ExpansionEntry {
 	pattern: RegExp;

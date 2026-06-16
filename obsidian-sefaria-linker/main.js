@@ -30,7 +30,7 @@ module.exports = __toCommonJS(main_exports);
 var import_obsidian = require("obsidian");
 
 // src/expansions.ts
-var DP = `(?:''|[""\u05F4])`;
+var DP = `(?:''|[""\u201C\u201D\u05F4])`;
 var SHORTFORM_EXPANSIONS = [
   // ════════════════════════════════════════════════════════════════════════════
   // SECTION 1 — SHULCHAN ARUKH WITH SECTION + SIMAN (most specific first)
