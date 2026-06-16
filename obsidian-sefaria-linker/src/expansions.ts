@@ -70,12 +70,12 @@ export const SHORTFORM_EXPANSIONS: ExpansionEntry[] = [
 	{ pattern: /\bSmak\b/g,        replacement: "Sefer Mitzvot Katan" },
 	{ pattern: /\bSmag\b/g,        replacement: "Sefer Mitzvot Gadol" },
 
-	// D"H / DH / "dibur hamaschil" — strip the marker and ALL words following it
-	// up to (but not including) a preposition or number that starts the actual citation.
-	// e.g. "d"h hamevin yavo" in "Tosfos d"h hamevin yavo in Brachos" → stripped.
-	{ pattern: new RegExp(`\\bD${DP}H\\s+(?:\\S+\\s+)*?(?=\\s*(?:in|on|at|al)\\b|\\d)`, "g"), replacement: "" },
-	{ pattern: /\bDH\s+(?:\S+\s+)*?(?=\s*(?:in|on|at|al)\b|\d)/g, replacement: "" },
-	{ pattern: /\bdibur\s+hamaschil\s+(?:\S+\s+)*?(?=\s*(?:in|on|at|al)\b|\d)/gi, replacement: "" },
+	// D"H / DH / "dibur hamaschil" — strip the marker and all words following it
+	// up to (but not including) the next preposition that introduces the citation.
+	// Greedy negative-lookahead: consume words as long as they are NOT in/on/at/al.
+	{ pattern: new RegExp(`\\bD${DP}H(?:\\s+(?!(?:in|on|at|al)\\b)\\S+)+`, "g"), replacement: "" },
+	{ pattern: /\bDH(?:\s+(?!(?:in|on|at|al)\b)\S+)+/g,                          replacement: "" },
+	{ pattern: /\bdibur\s+hamaschil(?:\s+(?!(?:in|on|at|al)\b)\S+)*/gi,           replacement: "" },
 
 	// ════════════════════════════════════════════════════════════════════════════
 	// SECTION 6 — TALMUD TRACTATE ABBREVIATIONS (gershayim-style)
