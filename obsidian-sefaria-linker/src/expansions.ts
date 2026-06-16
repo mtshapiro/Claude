@@ -285,6 +285,41 @@ export const SHORTFORM_EXPANSIONS: ExpansionEntry[] = [
 	{ pattern: /\bRus\s+Rabbah\b/g,            replacement: "Ruth Rabbah" },
 
 	// ════════════════════════════════════════════════════════════════════════════
+	// SECTION 7 — SHULCHAN ARUKH SECTION SHORTHANDS (standalone, no siman)
+	// ════════════════════════════════════════════════════════════════════════════
+
+	{ pattern: new RegExp(`\\bY${DP}D\\b`, "g"),  replacement: "Yoreh Deah" },
+	{ pattern: new RegExp(`\\bO${DP}C\\b`, "g"),  replacement: "Orach Chaim" },
+	{ pattern: new RegExp(`\\bE${DP}H\\b`, "g"),  replacement: "Even HaEzer" },
+	{ pattern: new RegExp(`\\bC${DP}M\\b`, "g"),  replacement: "Choshen Mishpat" },
+
+	// ════════════════════════════════════════════════════════════════════════════
+	// SECTION 7b — PREPOSITION NORMALISATION ("in" / "on" / "al" → correct form)
+	//
+	// In halachic writing "Tur in Y"D 201" means the same as "Tur on Y"D 201".
+	// We normalise the preposition so the API gets the expected citation format.
+	//
+	// Pattern: "[work] in/on/al [section/tractate]"
+	// These fire AFTER section shorthands so the section is already expanded.
+	// ════════════════════════════════════════════════════════════════════════════
+
+	// "[Work] in/on Yoreh De'ah / Orach Chayim / …" → "[Work], [section]"
+	// (space + preposition becomes a comma — Sefaria format: "Tur, Yoreh De'ah")
+	{ pattern: /\s+(?:in|on|al)\s+Yoreh\s+De['']?ah\b/gi,    replacement: ", Yoreh De'ah" },
+	{ pattern: /\s+(?:in|on|al)\s+Yoreh\s+Deah\b/gi,          replacement: ", Yoreh De'ah" },
+	{ pattern: /\s+(?:in|on|al)\s+Orach\s+Chai[iy]m\b/gi,    replacement: ", Orach Chayim" },
+	{ pattern: /\s+(?:in|on|al)\s+Even\s+HaEzer\b/gi,         replacement: ", Even HaEzer" },
+	{ pattern: /\s+(?:in|on|al)\s+Choshen\s+Mishpat\b/gi,     replacement: ", Choshen Mishpat" },
+
+	// "[Commentator] in [Tractate/Torah book]" → "[Commentator] on [...]"
+	// Covers Rashi in Berakhot, Tosfos in Chullin, Ramban in Bereishis, etc.
+	// Must come after tractate-spelling expansions so names are already canonical.
+	{
+		pattern: /\b(Rashi|Tosafot|Tosfos|Tosafos|Ramban|Rashba|Rashbam|Ran|Rosh|Ritva|Ritba|Meiri|Rif|Nimukei Yosef|Mordechai|Rashbo|Maggid Mishneh|Kessef Mishneh|Kesef Mishneh)\s+in\s+/g,
+		replacement: "$1 on "
+	},
+
+	// ════════════════════════════════════════════════════════════════════════════
 	// SECTION 14 — JERUSALEM TALMUD (YERUSHALMI)
 	// "Yerushalmi" prefix → "Jerusalem Talmud" so API finds the right corpus.
 	// Must come before tractate-name expansions so both fire in sequence.
