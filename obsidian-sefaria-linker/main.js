@@ -674,13 +674,42 @@ async function linkCitations(app, file, settings) {
     linkedRefs,
     updatedExistingRanges
   );
+  let outputContent = finalContent;
+  const titleUrl = await resolveTitleUrl(file.basename, settings);
+  if (titleUrl) {
+    const fullTitleUrl = `https://www.sefaria.org/${titleUrl}`;
+    const titleLine = `*[${file.basename}](${fullTitleUrl})*`;
+    const firstLine = outputContent.split("\n")[0];
+    const alreadyHasTitleLink = firstLine.startsWith("*[") && firstLine.includes("sefaria.org");
+    if (!alreadyHasTitleLink) {
+      outputContent = titleLine + "\n" + outputContent;
+    }
+  }
   const totalCount = linkedCount + contextualCount;
-  if (totalCount === 0) {
+  if (totalCount === 0 && outputContent === finalContent) {
     new import_obsidian.Notice("No citations found");
     return;
   }
-  await app.vault.modify(file, finalContent);
+  await app.vault.modify(file, outputContent);
   new import_obsidian.Notice(`Linked ${totalCount} citation${totalCount === 1 ? "" : "s"}`);
+}
+async function resolveTitleUrl(title, settings) {
+  var _a;
+  const { expandedText } = settings.enableShortformExpansion ? expandShortforms(title, []) : { expandedText: title, substitutions: [] };
+  const expanded = expandPageRanges(expandedText);
+  try {
+    const resp = await fetch(
+      `https://www.sefaria.org/api/texts/${encodeURIComponent(expanded)}?context=0&pad=0`
+    );
+    if (!resp.ok)
+      return null;
+    const data = await resp.json();
+    if (data.error || !data.ref)
+      return null;
+    return (_a = data.url) != null ? _a : data.ref.replace(/\s/g, "_");
+  } catch (e) {
+    return null;
+  }
 }
 var SefariaLinkerPlugin = class extends import_obsidian.Plugin {
   constructor() {

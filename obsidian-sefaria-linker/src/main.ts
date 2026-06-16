@@ -309,11 +309,50 @@ async function linkCitations(
 		updatedExistingRanges
 	);
 
-	const totalCount = linkedCount + contextualCount;
-	if (totalCount === 0) { new Notice("No citations found"); return; }
+	// Third pass: add a soft title link at the top of the note if the title
+	// resolves to a Sefaria ref and one isn't already present.
+	let outputContent = finalContent;
+	const titleUrl = await resolveTitleUrl(file.basename, settings);
+	if (titleUrl) {
+		const fullTitleUrl = `https://www.sefaria.org/${titleUrl}`;
+		const titleLine = `*[${file.basename}](${fullTitleUrl})*`;
+		const firstLine = outputContent.split("\n")[0];
+		const alreadyHasTitleLink =
+			firstLine.startsWith("*[") && firstLine.includes("sefaria.org");
+		if (!alreadyHasTitleLink) {
+			outputContent = titleLine + "\n" + outputContent;
+		}
+	}
 
-	await app.vault.modify(file, finalContent);
+	const totalCount = linkedCount + contextualCount;
+	if (totalCount === 0 && outputContent === finalContent) {
+		new Notice("No citations found");
+		return;
+	}
+
+	await app.vault.modify(file, outputContent);
 	new Notice(`Linked ${totalCount} citation${totalCount === 1 ? "" : "s"}`);
+}
+
+async function resolveTitleUrl(
+	title: string,
+	settings: SefariaLinkerSettings
+): Promise<string | null> {
+	const { expandedText } = settings.enableShortformExpansion
+		? expandShortforms(title, [])
+		: { expandedText: title, substitutions: [] };
+	const expanded = expandPageRanges(expandedText);
+	try {
+		const resp = await fetch(
+			`https://www.sefaria.org/api/texts/${encodeURIComponent(expanded)}?context=0&pad=0`
+		);
+		if (!resp.ok) return null;
+		const data = await resp.json();
+		if (data.error || !data.ref) return null;
+		return (data.url as string | undefined) ?? (data.ref as string).replace(/\s/g, "_");
+	} catch {
+		return null;
+	}
 }
 
 // ── Plugin ────────────────────────────────────────────────────────────────────
