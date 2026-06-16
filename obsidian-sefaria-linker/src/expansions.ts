@@ -22,145 +22,277 @@ export interface ExpansionEntry {
 }
 
 export const SHORTFORM_EXPANSIONS: ExpansionEntry[] = [
-	// ── Shulchan Arukh + section override (most specific first) ─────────────
-	{
-		// Sh''A O"C 123.4  →  Shulchan Arukh, Orach Chayim 123:4
-		pattern: new RegExp(`\\bSh${DP}A\\s+O${DP}C\\s+(\\d+)\\.(\\d+)`, "g"),
-		replacement: "Shulchan Arukh, Orach Chayim $1:$2",
-	},
-	{
-		// Sh''A E"H 123.4  →  Shulchan Arukh, Even HaEzer 123:4
-		pattern: new RegExp(`\\bSh${DP}A\\s+E${DP}H\\s+(\\d+)\\.(\\d+)`, "g"),
-		replacement: "Shulchan Arukh, Even HaEzer $1:$2",
-	},
-	{
-		// Sh''A C"M 123.4  →  Shulchan Arukh, Choshen Mishpat 123:4
-		pattern: new RegExp(`\\bSh${DP}A\\s+C${DP}M\\s+(\\d+)\\.(\\d+)`, "g"),
-		replacement: "Shulchan Arukh, Choshen Mishpat $1:$2",
-	},
-	{
-		// Sh''A 123.4  (bare, defaults to Yoreh De'ah)
-		pattern: new RegExp(`\\bSh${DP}A\\s+(\\d+)\\.(\\d+)`, "g"),
-		replacement: "Shulchan Arukh, Yoreh De'ah $1:$2",
-	},
 
-	// ── Shulchan Arukh commentaries on Yoreh De'ah ──────────────────────────
-	{
-		pattern: /\bShach\s+(\d+)\.(\d+)/g,
-		replacement: "Siftei Kohen on Shulchan Arukh, Yoreh De'ah $1:$2",
-	},
-	{
-		pattern: /\bTaz\s+(\d+)\.(\d+)/g,
-		replacement: "Turei Zahav on Shulchan Arukh, Yoreh De'ah $1:$2",
-	},
-	{
-		// B''H  (Ba'er Hetev)
-		pattern: new RegExp(`\\bB${DP}H\\s+(\\d+)\\.(\\d+)`, "g"),
-		replacement: "Ba'er Hetev on Shulchan Arukh, Yoreh De'ah $1:$2",
-	},
-	{
-		// N''HaK  (Nekudot HaKesef)
-		pattern: new RegExp(`\\bN${DP}HaK\\s+(\\d+)\\.(\\d+)`, "g"),
-		replacement: "Nekudot HaKesef on Shulchan Arukh, Yoreh De'ah $1:$2",
-	},
-	{
-		// P''T  (Pischei Teshuva)
-		pattern: new RegExp(`\\bP${DP}T\\s+(\\d+)\\.(\\d+)`, "g"),
-		replacement: "Pischei Teshuva on Shulchan Arukh, Yoreh De'ah $1:$2",
-	},
-	{
-		// B''Y  (Beit Yosef)
-		pattern: new RegExp(`\\bB${DP}Y\\s+(\\d+)\\.(\\d+)`, "g"),
-		replacement: "Beit Yosef, Yoreh De'ah $1:$2",
-	},
-	{
-		// D''M  (Darkei Moshe)
-		pattern: new RegExp(`\\bD${DP}M\\s+(\\d+)\\.(\\d+)`, "g"),
-		replacement: "Darkei Moshe, Yoreh De'ah $1:$2",
-	},
+	// ════════════════════════════════════════════════════════════════════════════
+	// SECTION 1 — SHULCHAN ARUKH WITH SECTION + SIMAN (most specific first)
+	// ════════════════════════════════════════════════════════════════════════════
 
-	// ── Tur ──────────────────────────────────────────────────────────────────
-	{
-		pattern: /\bTur\s+(\d+)\.(\d+)/g,
-		replacement: "Tur, Yoreh De'ah $1:$2",
-	},
+	// Sh''A O"C 123.4  →  Shulchan Arukh, Orach Chayim 123:4
+	{ pattern: new RegExp(`\\bSh${DP}A\\s+O${DP}C\\s+(\\d+)\\.(\\d+)`, "g"), replacement: "Shulchan Arukh, Orach Chayim $1:$2" },
+	// Sh''A Y"D 123.4
+	{ pattern: new RegExp(`\\bSh${DP}A\\s+Y${DP}D\\s+(\\d+)\\.(\\d+)`, "g"), replacement: "Shulchan Arukh, Yoreh De'ah $1:$2" },
+	// Sh''A E"H 123.4
+	{ pattern: new RegExp(`\\bSh${DP}A\\s+E${DP}H\\s+(\\d+)\\.(\\d+)`, "g"), replacement: "Shulchan Arukh, Even HaEzer $1:$2" },
+	// Sh''A C"M 123.4
+	{ pattern: new RegExp(`\\bSh${DP}A\\s+C${DP}M\\s+(\\d+)\\.(\\d+)`, "g"), replacement: "Shulchan Arukh, Choshen Mishpat $1:$2" },
+	// Sh''A 123.4  (bare — default to Yoreh De'ah, most common in halacha notes)
+	{ pattern: new RegExp(`\\bSh${DP}A\\s+(\\d+)\\.(\\d+)`, "g"), replacement: "Shulchan Arukh, Yoreh De'ah $1:$2" },
 
-	// ── Rambam / Mishneh Torah ────────────────────────────────────────────────
-	{
-		// M''A  (Mishneh Torah, Forbidden Foods)
-		pattern: new RegExp(`\\bM${DP}A\\s+(\\d+)\\.(\\d+)`, "g"),
-		replacement: "Mishneh Torah, Forbidden Foods $1:$2",
-	},
+	// ════════════════════════════════════════════════════════════════════════════
+	// SECTION 2 — SHULCHAN ARUKH COMMENTARIES (with siman.seif)
+	// ════════════════════════════════════════════════════════════════════════════
 
-	// ── Standalone Rishon works ───────────────────────────────────────────────
-	{
-		pattern: /\bIVHA\b/g,
-		replacement: "Issur VeHeter HaArokh",
-	},
-	{
-		pattern: /\bSmak\b/g,
-		replacement: "Sefer Mitzvot Katan",
-	},
-	{
-		pattern: /\bSmag\b/g,
-		replacement: "Sefer Mitzvot Gadol",
-	},
+	{ pattern: /\bShach\s+(\d+)\.(\d+)/g,                                           replacement: "Siftei Kohen on Shulchan Arukh, Yoreh De'ah $1:$2" },
+	{ pattern: /\bTaz\s+(\d+)\.(\d+)/g,                                             replacement: "Turei Zahav on Shulchan Arukh, Yoreh De'ah $1:$2" },
+	{ pattern: new RegExp(`\\bB${DP}H\\s+(\\d+)\\.(\\d+)`, "g"),                   replacement: "Ba'er Hetev on Shulchan Arukh, Yoreh De'ah $1:$2" },
+	{ pattern: new RegExp(`\\bN${DP}HaK\\s+(\\d+)\\.(\\d+)`, "g"),                 replacement: "Nekudot HaKesef on Shulchan Arukh, Yoreh De'ah $1:$2" },
+	{ pattern: new RegExp(`\\bP${DP}T\\s+(\\d+)\\.(\\d+)`, "g"),                   replacement: "Pischei Teshuva on Shulchan Arukh, Yoreh De'ah $1:$2" },
+	{ pattern: new RegExp(`\\bB${DP}Y\\s+(\\d+)\\.(\\d+)`, "g"),                   replacement: "Beit Yosef, Yoreh De'ah $1:$2" },
+	{ pattern: new RegExp(`\\bD${DP}M\\s+(\\d+)\\.(\\d+)`, "g"),                   replacement: "Darkei Moshe, Yoreh De'ah $1:$2" },
 
-	// ── Tractate abbreviations ────────────────────────────────────────────────
-	{
-		// A''Z  →  Avodah Zarah
-		pattern: new RegExp(`\\bA${DP}Z\\b`, "g"),
-		replacement: "Avodah Zarah",
-	},
-	// Existing single-quote abbreviations already handled by the old expansion
-	// are kept here so everything lives in one place:
-	{
-		pattern: new RegExp(`\\bB${DP}K\\b`, "g"),
-		replacement: "Bava Kamma",
-	},
-	{
-		pattern: new RegExp(`\\bB${DP}M\\b`, "g"),
-		replacement: "Bava Metzia",
-	},
-	{
-		pattern: new RegExp(`\\bB${DP}B\\b`, "g"),
-		replacement: "Bava Batra",
-	},
-	{
-		pattern: new RegExp(`\\bY${DP}T\\b`, "g"),
-		replacement: "Beitza",
-	},
-	{
-		pattern: new RegExp(`\\bR${DP}H\\b`, "g"),
-		replacement: "Rosh Hashanah",
-	},
-	{
-		pattern: new RegExp(`\\bM${DP}K\\b`, "g"),
-		replacement: "Moed Katan",
-	},
-	// ── Hebrew names for Tanakh books ────────────────────────────────────────
-	{ pattern: /\bBereishis\b/g, replacement: "Genesis" },
-	{ pattern: /\bBereishit\b/g, replacement: "Genesis" },
-	{ pattern: /\bShemos\b/g, replacement: "Exodus" },
-	{ pattern: /\bShemot\b/g, replacement: "Exodus" },
-	{ pattern: /\bVayikra\b/g, replacement: "Leviticus" },
-	{ pattern: /\bBamidbar\b/g, replacement: "Numbers" },
-	{ pattern: /\bDevarim\b/g, replacement: "Deuteronomy" },
-	{ pattern: /\bTehillim\b/g, replacement: "Psalms" },
-	{ pattern: /\bMishlei\b/g, replacement: "Proverbs" },
-	{ pattern: /\bKoheles\b/g, replacement: "Ecclesiastes" },
-	{ pattern: /\bKohelet\b/g, replacement: "Ecclesiastes" },
-	{ pattern: /\bIyov\b/g, replacement: "Job" },
-	{ pattern: /\bYeshaya\b/g, replacement: "Isaiah" },
-	{ pattern: /\bYirmiyahu\b/g, replacement: "Jeremiah" },
-	{ pattern: /\bYechezkel\b/g, replacement: "Ezekiel" },
-	{ pattern: /\bShir HaShirim\b/g, replacement: "Song of Songs" },
-	{ pattern: /\bEichah\b/g, replacement: "Lamentations" },
-	{ pattern: /\bRus\b/g, replacement: "Ruth" },
-	{ pattern: /\bYehoshua\b/g, replacement: "Joshua" },
-	{ pattern: /\bShoftim\b/g, replacement: "Judges" },
-	{ pattern: /\bZechariah\b/g, replacement: "Zechariah" },
-	{ pattern: /\bMalachi\b/g, replacement: "Malachi" },
+	// ════════════════════════════════════════════════════════════════════════════
+	// SECTION 3 — TUR (with siman.seif)
+	// ════════════════════════════════════════════════════════════════════════════
+
+	{ pattern: /\bTur\s+(\d+)\.(\d+)/g, replacement: "Tur, Yoreh De'ah $1:$2" },
+
+	// ════════════════════════════════════════════════════════════════════════════
+	// SECTION 4 — RAMBAM / MISHNEH TORAH (section abbreviations with chapter.halacha)
+	// ════════════════════════════════════════════════════════════════════════════
+
+	{ pattern: new RegExp(`\\bM${DP}A\\s+(\\d+)\\.(\\d+)`, "g"), replacement: "Mishneh Torah, Forbidden Foods $1:$2" },
+
+	// ════════════════════════════════════════════════════════════════════════════
+	// SECTION 5 — STANDALONE RISHON / ACHARON WORKS
+	// ════════════════════════════════════════════════════════════════════════════
+
+	{ pattern: /\bIVHA\b/g,        replacement: "Issur VeHeter HaArokh" },
+	{ pattern: /\bSmak\b/g,        replacement: "Sefer Mitzvot Katan" },
+	{ pattern: /\bSmag\b/g,        replacement: "Sefer Mitzvot Gadol" },
+
+	// ════════════════════════════════════════════════════════════════════════════
+	// SECTION 6 — TALMUD TRACTATE ABBREVIATIONS (gershayim-style)
+	// ════════════════════════════════════════════════════════════════════════════
+
+	{ pattern: new RegExp(`\\bA${DP}Z\\b`, "g"),  replacement: "Avodah Zarah" },
+	{ pattern: new RegExp(`\\bB${DP}K\\b`, "g"),  replacement: "Bava Kamma" },
+	{ pattern: new RegExp(`\\bB${DP}M\\b`, "g"),  replacement: "Bava Metzia" },
+	{ pattern: new RegExp(`\\bB${DP}B\\b`, "g"),  replacement: "Bava Batra" },
+	{ pattern: new RegExp(`\\bY${DP}T\\b`, "g"),  replacement: "Beitzah" },
+	{ pattern: new RegExp(`\\bR${DP}H\\b`, "g"),  replacement: "Rosh Hashanah" },
+	{ pattern: new RegExp(`\\bM${DP}K\\b`, "g"),  replacement: "Moed Katan" },
+	{ pattern: new RegExp(`\\bK${DP}H\\b`, "g"),  replacement: "Kiddushin" },
+
+	// ════════════════════════════════════════════════════════════════════════════
+	// SECTION 7 — SHULCHAN ARUKH SECTION SHORTHANDS (standalone, no siman)
+	// ════════════════════════════════════════════════════════════════════════════
+
+	{ pattern: new RegExp(`\\bY${DP}D\\b`, "g"),  replacement: "Yoreh Deah" },
+	{ pattern: new RegExp(`\\bO${DP}C\\b`, "g"),  replacement: "Orach Chaim" },
+	{ pattern: new RegExp(`\\bE${DP}H\\b`, "g"),  replacement: "Even HaEzer" },
+	{ pattern: new RegExp(`\\bC${DP}M\\b`, "g"),  replacement: "Choshen Mishpat" },
+
+	// ════════════════════════════════════════════════════════════════════════════
+	// SECTION 8 — TANAKH: TORAH (Hebrew/Ashkenazi → English canonical)
+	// More specific compound forms first, then single-word forms.
+	// ════════════════════════════════════════════════════════════════════════════
+
+	{ pattern: /\bBereishis\b/g,   replacement: "Genesis" },
+	{ pattern: /\bBereishit\b/g,   replacement: "Genesis" },
+	{ pattern: /\bBereshit\b/g,    replacement: "Genesis" },
+	{ pattern: /\bShemos\b/g,      replacement: "Exodus" },
+	{ pattern: /\bShemot\b/g,      replacement: "Exodus" },
+	{ pattern: /\bShmot\b/g,       replacement: "Exodus" },
+	{ pattern: /\bVayikra\b/g,     replacement: "Leviticus" },
+	{ pattern: /\bWayikra\b/g,     replacement: "Leviticus" },
+	{ pattern: /\bBamidbar\b/g,    replacement: "Numbers" },
+	{ pattern: /\bBemidbar\b/g,    replacement: "Numbers" },
+	{ pattern: /\bDevarim\b/g,     replacement: "Deuteronomy" },
+	{ pattern: /\bDevorim\b/g,     replacement: "Deuteronomy" },
+
+	// ════════════════════════════════════════════════════════════════════════════
+	// SECTION 9 — TANAKH: NEVI'IM (Prophets)
+	// Compound "I/II" forms before plain name to avoid partial matches.
+	// ════════════════════════════════════════════════════════════════════════════
+
+	{ pattern: /\bYehoshua\b/g,    replacement: "Joshua" },
+	{ pattern: /\bShoftim\b/g,     replacement: "Judges" },
+
+	// Samuel — I/II prefixed forms first
+	{ pattern: /\bI\s+Shmuel\b/g,            replacement: "I Samuel" },
+	{ pattern: /\bII\s+Shmuel\b/g,           replacement: "II Samuel" },
+	{ pattern: /\bShmuel\s+Aleph\b/gi,       replacement: "I Samuel" },
+	{ pattern: /\bShmuel\s+Beis\b/gi,        replacement: "II Samuel" },
+	{ pattern: /\bShmuel\s+Bet\b/gi,         replacement: "II Samuel" },
+
+	// Kings — I/II prefixed forms first
+	{ pattern: /\bI\s+Melachim\b/g,          replacement: "I Kings" },
+	{ pattern: /\bII\s+Melachim\b/g,         replacement: "II Kings" },
+	{ pattern: /\bMelachim\s+Aleph\b/gi,     replacement: "I Kings" },
+	{ pattern: /\bMelachim\s+Beis\b/gi,      replacement: "II Kings" },
+	{ pattern: /\bMelachim\s+Bet\b/gi,       replacement: "II Kings" },
+
+	// Chronicles
+	{ pattern: /\bI\s+Divrei\s+Hayamim\b/g,          replacement: "I Chronicles" },
+	{ pattern: /\bII\s+Divrei\s+Hayamim\b/g,          replacement: "II Chronicles" },
+	{ pattern: /\bDivrei\s+Hayamim\s+Aleph\b/gi,      replacement: "I Chronicles" },
+	{ pattern: /\bDivrei\s+Hayamim\s+Beis\b/gi,       replacement: "II Chronicles" },
+	{ pattern: /\bDivrei\s+Hayamim\s+Bet\b/gi,        replacement: "II Chronicles" },
+
+	// Latter Prophets (Yeshayahu etc.)
+	{ pattern: /\bYeshayahu\b/g,   replacement: "Isaiah" },
+	{ pattern: /\bYeshaya\b/g,     replacement: "Isaiah" },
+	{ pattern: /\bYirmiyahu\b/g,   replacement: "Jeremiah" },
+	{ pattern: /\bYirmiya\b/g,     replacement: "Jeremiah" },
+	{ pattern: /\bYechezkel\b/g,   replacement: "Ezekiel" },
+	{ pattern: /\bYechezkeil\b/g,  replacement: "Ezekiel" },
+
+	// Twelve Minor Prophets
+	{ pattern: /\bHoshea\b/g,      replacement: "Hosea" },
+	{ pattern: /\bYoel\b/g,        replacement: "Joel" },
+	{ pattern: /\bOvadiah\b/g,     replacement: "Obadiah" },
+	{ pattern: /\bOvadya\b/g,      replacement: "Obadiah" },
+	{ pattern: /\bYonah\b/g,       replacement: "Jonah" },
+	{ pattern: /\bMicha\b/g,       replacement: "Micah" },
+	{ pattern: /\bMichah\b/g,      replacement: "Micah" },
+	{ pattern: /\bNachum\b/g,      replacement: "Nahum" },
+	{ pattern: /\bChabakuk\b/g,    replacement: "Habakkuk" },
+	{ pattern: /\bChavakuk\b/g,    replacement: "Habakkuk" },
+	{ pattern: /\bTzefaniah\b/g,   replacement: "Zephaniah" },
+	{ pattern: /\bTzfanya\b/g,     replacement: "Zephaniah" },
+	{ pattern: /\bChaggai\b/g,     replacement: "Haggai" },
+	{ pattern: /\bChagai\b/g,      replacement: "Haggai" },
+	{ pattern: /\bZecharya\b/g,    replacement: "Zechariah" },
+	{ pattern: /\bZecharia\b/g,    replacement: "Zechariah" },
+
+	// ════════════════════════════════════════════════════════════════════════════
+	// SECTION 10 — TANAKH: KETUVIM (Writings)
+	// ════════════════════════════════════════════════════════════════════════════
+
+	{ pattern: /\bTehillim\b/g,        replacement: "Psalms" },
+	{ pattern: /\bTehilim\b/g,         replacement: "Psalms" },
+	{ pattern: /\bMishlei\b/g,         replacement: "Proverbs" },
+	{ pattern: /\bKoheles\b/g,         replacement: "Ecclesiastes" },
+	{ pattern: /\bKohelet\b/g,         replacement: "Ecclesiastes" },
+	{ pattern: /\bQohelet\b/g,         replacement: "Ecclesiastes" },
+	{ pattern: /\bIyov\b/g,            replacement: "Job" },
+	{ pattern: /\bIyob\b/g,            replacement: "Job" },
+	{ pattern: /\bShir\s+HaShirim\b/g, replacement: "Song of Songs" },
+	{ pattern: /\bShir\s+Hashirim\b/g, replacement: "Song of Songs" },
+	{ pattern: /\bRus\b/g,             replacement: "Ruth" },
+	{ pattern: /\bEichah\b/g,          replacement: "Lamentations" },
+	{ pattern: /\bEikhah\b/g,          replacement: "Lamentations" },
+	{ pattern: /\bEicha\b/g,           replacement: "Lamentations" },
+	{ pattern: /\bNechemya\b/g,        replacement: "Nehemiah" },
+	{ pattern: /\bNechemia\b/g,        replacement: "Nehemiah" },
+
+	// ════════════════════════════════════════════════════════════════════════════
+	// SECTION 11 — TALMUD TRACTATE ALTERNATE SPELLINGS
+	// Ashkenazi/Yiddish pronunciations that differ enough to confuse the API.
+	// ════════════════════════════════════════════════════════════════════════════
+
+	// Berakhot
+	{ pattern: /\bBerachos\b/g,    replacement: "Berakhot" },
+	{ pattern: /\bBerachot\b/g,    replacement: "Berakhot" },
+	{ pattern: /\bBrachos\b/g,     replacement: "Berakhot" },
+	{ pattern: /\bBrachot\b/g,     replacement: "Berakhot" },
+	// Shabbat
+	{ pattern: /\bShabbos\b/g,     replacement: "Shabbat" },
+	// Eruvin/Eiruvin
+	{ pattern: /\bEruvin\b/g,      replacement: "Eiruvin" },
+	// Pesachim
+	{ pattern: /\bPsachim\b/g,     replacement: "Pesachim" },
+	// Yoma
+	{ pattern: /\bYuma\b/g,        replacement: "Yoma" },
+	// Sukkah
+	{ pattern: /\bSukka\b/g,       replacement: "Sukkah" },
+	// Beitzah
+	{ pattern: /\bBeisa\b/g,       replacement: "Beitzah" },
+	{ pattern: /\bBeiza\b/g,       replacement: "Beitzah" },
+	{ pattern: /\bBeizah\b/g,      replacement: "Beitzah" },
+	// Ta'anit
+	{ pattern: /\bTaanis\b/g,      replacement: "Ta'anit" },
+	{ pattern: /\bTaanit\b/g,      replacement: "Ta'anit" },
+	{ pattern: /\bTa'anis\b/g,     replacement: "Ta'anit" },
+	{ pattern: /\bTaaniyos\b/g,    replacement: "Ta'anit" },
+	// Megillah
+	{ pattern: /\bMegila\b/g,      replacement: "Megillah" },
+	// Chagigah
+	{ pattern: /\bChagiga\b/g,     replacement: "Chagigah" },
+	{ pattern: /\bHagigah\b/g,     replacement: "Chagigah" },
+	{ pattern: /\bChagigos\b/g,    replacement: "Chagigah" },
+	// Yevamot
+	{ pattern: /\bYevamos\b/g,     replacement: "Yevamot" },
+	{ pattern: /\bYevamoth\b/g,    replacement: "Yevamot" },
+	// Ketubot
+	{ pattern: /\bKesuvos\b/g,     replacement: "Ketubot" },
+	{ pattern: /\bKesubos\b/g,     replacement: "Ketubot" },
+	{ pattern: /\bKetubos\b/g,     replacement: "Ketubot" },
+	// Sotah
+	{ pattern: /\bSoto\b/g,        replacement: "Sotah" },
+	// Gittin
+	{ pattern: /\bGitin\b/g,       replacement: "Gittin" },
+	// Kiddushin
+	{ pattern: /\bKidushin\b/g,    replacement: "Kiddushin" },
+	{ pattern: /\bKidushim\b/g,    replacement: "Kiddushin" },
+	// Sanhedrin
+	{ pattern: /\bSanhedrim\b/g,   replacement: "Sanhedrin" },
+	// Makkot
+	{ pattern: /\bMakkos\b/g,      replacement: "Makkot" },
+	{ pattern: /\bMakos\b/g,       replacement: "Makkot" },
+	// Shevuot
+	{ pattern: /\bShevuos\b/g,     replacement: "Shevuot" },
+	{ pattern: /\bShvuos\b/g,      replacement: "Shevuot" },
+	{ pattern: /\bShvuot\b/g,      replacement: "Shevuot" },
+	// Horayot
+	{ pattern: /\bHorayos\b/g,     replacement: "Horayot" },
+	{ pattern: /\bHoriyot\b/g,     replacement: "Horayot" },
+	// Zevachim
+	{ pattern: /\bZevahim\b/g,     replacement: "Zevachim" },
+	// Menachot
+	{ pattern: /\bMenachos\b/g,    replacement: "Menachot" },
+	{ pattern: /\bMenahos\b/g,     replacement: "Menachot" },
+	{ pattern: /\bMenahot\b/g,     replacement: "Menachot" },
+	// Chullin / Hullin
+	{ pattern: /\bChullin\b/g,     replacement: "Hullin" },
+	{ pattern: /\bChulin\b/g,      replacement: "Hullin" },
+	// Bekhorot
+	{ pattern: /\bBechorot\b/g,    replacement: "Bekhorot" },
+	{ pattern: /\bBechoros\b/g,    replacement: "Bekhorot" },
+	{ pattern: /\bBekoros\b/g,     replacement: "Bekhorot" },
+	// Arakhin
+	{ pattern: /\bArachin\b/g,     replacement: "Arakhin" },
+	{ pattern: /\bArcin\b/g,       replacement: "Arakhin" },
+	// Keritot
+	{ pattern: /\bKerisus\b/g,     replacement: "Keritot" },
+	{ pattern: /\bKerisos\b/g,     replacement: "Keritot" },
+	// Me'ilah
+	{ pattern: /\bMeilah\b/g,      replacement: "Me'ilah" },
+	// Niddah
+	{ pattern: /\bNidah\b/g,       replacement: "Niddah" },
+
+	// ════════════════════════════════════════════════════════════════════════════
+	// SECTION 12 — MISHNAH TRACTATES (Pirkei Avot alternate spellings)
+	// ════════════════════════════════════════════════════════════════════════════
+
+	{ pattern: /\bPirkei\s+Avos\b/g,  replacement: "Pirkei Avot" },
+	{ pattern: /\bPirke\s+Avot\b/g,   replacement: "Pirkei Avot" },
+	{ pattern: /\bPirke\s+Avos\b/g,   replacement: "Pirkei Avot" },
+
+	// ════════════════════════════════════════════════════════════════════════════
+	// SECTION 13 — MIDRASH RABBAH (Hebrew/Ashkenazi names → Sefaria canonical)
+	// More specific compound names first.
+	// ════════════════════════════════════════════════════════════════════════════
+
+	{ pattern: /\bBereishis\s+Rabbah\b/g,      replacement: "Bereishit Rabbah" },
+	{ pattern: /\bShemos\s+Rabbah\b/g,         replacement: "Shemot Rabbah" },
+	{ pattern: /\bDevorim\s+Rabbah\b/g,        replacement: "Devarim Rabbah" },
+	{ pattern: /\bShir\s+HaShirim\s+Rabbah\b/g, replacement: "Shir Hashirim Rabbah" },
+	{ pattern: /\bEichah\s+Rabbah\b/g,         replacement: "Eikhah Rabbah" },
+	{ pattern: /\bEicha\s+Rabbah\b/g,          replacement: "Eikhah Rabbah" },
+	{ pattern: /\bKoheles\s+Rabbah\b/g,        replacement: "Kohelet Rabbah" },
+	{ pattern: /\bRus\s+Rabbah\b/g,            replacement: "Ruth Rabbah" },
+
 ];
 
 // ── Types ─────────────────────────────────────────────────────────────────────
