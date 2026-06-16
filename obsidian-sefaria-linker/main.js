@@ -270,7 +270,127 @@ var SHORTFORM_EXPANSIONS = [
   { pattern: /\bEichah\s+Rabbah\b/g, replacement: "Eikhah Rabbah" },
   { pattern: /\bEicha\s+Rabbah\b/g, replacement: "Eikhah Rabbah" },
   { pattern: /\bKoheles\s+Rabbah\b/g, replacement: "Kohelet Rabbah" },
-  { pattern: /\bRus\s+Rabbah\b/g, replacement: "Ruth Rabbah" }
+  { pattern: /\bRus\s+Rabbah\b/g, replacement: "Ruth Rabbah" },
+  // ════════════════════════════════════════════════════════════════════════════
+  // SECTION 14 — JERUSALEM TALMUD (YERUSHALMI)
+  // "Yerushalmi" prefix → "Jerusalem Talmud" so API finds the right corpus.
+  // Must come before tractate-name expansions so both fire in sequence.
+  // ════════════════════════════════════════════════════════════════════════════
+  { pattern: /\bYerushalmi\b/g, replacement: "Jerusalem Talmud" },
+  { pattern: /\bTalmud\s+Yerushalmi\b/g, replacement: "Jerusalem Talmud" },
+  // ════════════════════════════════════════════════════════════════════════════
+  // SECTION 15 — MASECHES / MASECHTA PREFIX STRIPPING
+  // These Hebrew/Aramaic prefixes have no meaning for Sefaria lookup.
+  // ════════════════════════════════════════════════════════════════════════════
+  { pattern: /\bMaseches\s+/g, replacement: "" },
+  { pattern: /\bMasechta\s+/g, replacement: "" },
+  { pattern: /\bMasekhet\s+/g, replacement: "" },
+  { pattern: /\bMasekhta\s+/g, replacement: "" },
+  { pattern: /\bMasechet\s+/g, replacement: "" },
+  // ════════════════════════════════════════════════════════════════════════════
+  // SECTION 16 — RISHON / COMMENTARY NAME NORMALISATION
+  // Ashkenazi alternate spellings → Sefaria canonical names.
+  // ════════════════════════════════════════════════════════════════════════════
+  // Tosafot
+  { pattern: /\bTosfos\b/g, replacement: "Tosafot" },
+  { pattern: /\bTosafos\b/g, replacement: "Tosafot" },
+  { pattern: /\bTosfot\b/g, replacement: "Tosafot" },
+  // Rashi (usually fine, but cover alternate)
+  { pattern: /\bRaschi\b/g, replacement: "Rashi" },
+  // Rashba (Rashbo is an alternate abbreviation used in some texts)
+  { pattern: /\bRashbo\b/g, replacement: "Rashba" },
+  // Ritva
+  { pattern: /\bRitba\b/g, replacement: "Ritva" },
+  // Ran (Rabbenu Nissim)
+  { pattern: /\bR(?:abbenu|abbeynu)\s+Nissim\b/gi, replacement: "Ran" },
+  // Rosh (Rabbenu Asher)
+  { pattern: /\bRabbenu\s+Asher\b/gi, replacement: "Rosh" },
+  // Nimukei Yosef
+  { pattern: /\bNimukei\s+Yosef\b/g, replacement: "Nimukei Yosef" },
+  { pattern: /\bNimuke[iy]\s+Yosef\b/g, replacement: "Nimukei Yosef" },
+  // Mordechai (the rishon on Talmud)
+  { pattern: /\bMordechai\b/g, replacement: "Mordechai" },
+  // Meiri
+  { pattern: /\bMeiry\b/g, replacement: "Meiri" },
+  { pattern: /\bBeit\s+HaBechirah\b/g, replacement: "Meiri" },
+  { pattern: /\bBeis\s+HaBechirah\b/g, replacement: "Meiri" },
+  // Maggid Mishneh
+  { pattern: /\bMaggid\s+Mishneh\b/g, replacement: "Maggid Mishneh" },
+  { pattern: /\bMagid\s+Mishneh\b/g, replacement: "Maggid Mishneh" },
+  // Kessef Mishneh (Sefaria uses double-s)
+  { pattern: /\bKe[ss]+ef\s+Mishneh\b/g, replacement: "Kessef Mishneh" },
+  // ════════════════════════════════════════════════════════════════════════════
+  // SECTION 17 — ACHARONIM (later authorities)
+  // ════════════════════════════════════════════════════════════════════════════
+  // Mishnah Berurah (alternate spellings)
+  { pattern: /\bMishna\s+Berura\b/g, replacement: "Mishnah Berurah" },
+  { pattern: /\bMishnah\s+Berura\b/g, replacement: "Mishnah Berurah" },
+  { pattern: /\bMishneh\s+Berura\b/g, replacement: "Mishnah Berurah" },
+  { pattern: /\bM(?:ishna|ishnah|ishneh)\s+B(?:erura|erurah)\b/g, replacement: "Mishnah Berurah" },
+  // Chatam Sofer (Chasam Sofer is Ashkenazi pronunciation)
+  { pattern: /\bChasam\s+Sofer\b/g, replacement: "Chatam Sofer" },
+  { pattern: /\bChatam\s+Sofer\b/g, replacement: "Chatam Sofer" },
+  { pattern: /\bHatam\s+Sofer\b/g, replacement: "Chatam Sofer" },
+  // Noda BiYehudah (alternate spellings)
+  { pattern: /\bNoda\s+B[i']?[Yy]ehudah\b/g, replacement: "Noda BiYehudah" },
+  { pattern: /\bNoda\s+B[i']?[Yy]ehuda\b/g, replacement: "Noda BiYehudah" },
+  { pattern: /\bNoda\s+Biy?[Yy]ehudah\b/g, replacement: "Noda BiYehudah" },
+  // Igrot Moshe (Responsa of Rav Moshe Feinstein)
+  { pattern: /\bIgros\s+Moshe\b/g, replacement: "Igrot Moshe" },
+  { pattern: /\bIgrot\s+Moshe\b/g, replacement: "Igrot Moshe" },
+  { pattern: /\bIgeros\s+Moshe\b/g, replacement: "Igrot Moshe" },
+  // Aruch HaShulchan
+  { pattern: /\bAruch\s+HaShulchan\b/g, replacement: "Aruch HaShulchan" },
+  { pattern: /\bArukh\s+HaShulchan\b/g, replacement: "Aruch HaShulchan" },
+  { pattern: /\bAruch\s+Hashulchan\b/g, replacement: "Aruch HaShulchan" },
+  // Kaf HaChayim / Kaf HaChaim
+  { pattern: /\bKaf\s+HaChai[im]m?\b/g, replacement: "Kaf HaChayim" },
+  { pattern: /\bKaf\s+Hachai[im]m?\b/g, replacement: "Kaf HaChayim" },
+  // Magen Avraham (on Orach Chayim)
+  { pattern: /\bMagen\s+Avraham\b/g, replacement: "Magen Avraham" },
+  { pattern: /\bMagen\s+Avrohom\b/g, replacement: "Magen Avraham" },
+  // Beur HaGra
+  { pattern: /\bBeur\s+HaGra\b/g, replacement: "Beur HaGra" },
+  { pattern: /\bBiur\s+HaGra\b/g, replacement: "Beur HaGra" },
+  // Chayei Adam
+  { pattern: /\bChayei\s+Adam\b/g, replacement: "Chayei Adam" },
+  { pattern: /\bChayyei\s+Adam\b/g, replacement: "Chayei Adam" },
+  // Kitzur Shulchan Arukh
+  { pattern: /\bKitzur\s+Shulchan\s+Aruch\b/g, replacement: "Kitzur Shulchan Arukh" },
+  { pattern: /\bKitzur\s+Shulchan\s+Arukh\b/g, replacement: "Kitzur Shulchan Arukh" },
+  { pattern: /\bKitzur\s+S(?:hulchan|hulkan)\s+A(?:ruch|rukh)\b/g, replacement: "Kitzur Shulchan Arukh" },
+  // ════════════════════════════════════════════════════════════════════════════
+  // SECTION 18 — TANNAITIC / MIDRASHIC WORKS
+  // ════════════════════════════════════════════════════════════════════════════
+  // Mekhilta DeRabbi Yishmael (most common "Mechilta")
+  { pattern: /\bMechilta\s+(?:D[e']?Rabbi\s+Yishmael|DeRabbi\s+Yishmael)\b/g, replacement: "Mekhilta DeRabbi Yishmael" },
+  { pattern: /\bMekhilta\s+(?:D[e']?Rabbi\s+Yishmael|DeRabbi\s+Yishmael)\b/g, replacement: "Mekhilta DeRabbi Yishmael" },
+  { pattern: /\bMechilta\s+(?:D[e']?Rabbi\s+Shimon|DeRabbi\s+Shimon)\b/g, replacement: "Mekhilta DeRabbi Shimon Ben Yochai" },
+  { pattern: /\bMekhilta\s+(?:D[e']?Rabbi\s+Shimon|DeRabbi\s+Shimon)\b/g, replacement: "Mekhilta DeRabbi Shimon Ben Yochai" },
+  // bare "Mechilta" defaults to the most common version (Yishmael)
+  { pattern: /\bMechilta\b/g, replacement: "Mekhilta DeRabbi Yishmael" },
+  { pattern: /\bMekhilta\b/g, replacement: "Mekhilta DeRabbi Yishmael" },
+  // Sifra (on Leviticus)
+  { pattern: /\bSifra\b/g, replacement: "Sifra" },
+  { pattern: /\bTorat\s+Kohanim\b/g, replacement: "Sifra" },
+  // Sifrei (on Bamidbar / Devarim — try to distinguish)
+  { pattern: /\bSifrei\s+(?:on\s+)?(?:Bamidbar|Numbers|Bemidbar)\b/gi, replacement: "Sifrei Bamidbar" },
+  { pattern: /\bSifrei\s+(?:on\s+)?(?:Devarim|Devorim|Deuteronomy)\b/gi, replacement: "Sifrei Devarim" },
+  { pattern: /\bSifre\s+(?:on\s+)?(?:Bamidbar|Numbers|Bemidbar)\b/gi, replacement: "Sifrei Bamidbar" },
+  { pattern: /\bSifre\s+(?:on\s+)?(?:Devarim|Devorim|Deuteronomy)\b/gi, replacement: "Sifrei Devarim" },
+  // bare Sifre/Sifrei without qualifier — default to Sifrei Devarim (more commonly cited)
+  { pattern: /\bSifre\b/g, replacement: "Sifrei Devarim" },
+  // Midrash Tanchuma
+  { pattern: /\bMidrash\s+Tanchuma\b/g, replacement: "Midrash Tanchuma" },
+  { pattern: /\bTanchuma\b/g, replacement: "Midrash Tanchuma" },
+  { pattern: /\bTankhuma\b/g, replacement: "Midrash Tanchuma" },
+  // Pesikta DeRav Kahana
+  { pattern: /\bPesikta\s+D[e']?Rav\s+Kahana\b/g, replacement: "Pesikta DeRav Kahana" },
+  { pattern: /\bPesikta\s+de-?Rab\s+Kahana\b/gi, replacement: "Pesikta DeRav Kahana" },
+  { pattern: /\bPesikta\s+Rabbati\b/g, replacement: "Pesikta Rabbati" },
+  // Pirkei DeRabbi Eliezer
+  { pattern: /\bPirkei\s+(?:de-?|D[e']?)Rabbi\s+Eliezer\b/gi, replacement: "Pirkei DeRabbi Eliezer" },
+  { pattern: /\bPDRE\b/g, replacement: "Pirkei DeRabbi Eliezer" }
 ];
 function expandShortforms(text, skipRanges = []) {
   const rawMatches = [];
