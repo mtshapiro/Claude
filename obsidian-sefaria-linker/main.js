@@ -69,10 +69,12 @@ var SHORTFORM_EXPANSIONS = [
   { pattern: /\bIVHA\b/g, replacement: "Issur VeHeter HaArokh" },
   { pattern: /\bSmak\b/g, replacement: "Sefer Mitzvot Katan" },
   { pattern: /\bSmag\b/g, replacement: "Sefer Mitzvot Gadol" },
-  // D"H / DH  (dibur hamaschil — strip the marker and the word(s) that follow
-  // up to the next citation keyword so the tractate/book ref remains clean)
-  { pattern: new RegExp(`\\bD${DP}H\\s+\\S+`, "g"), replacement: "" },
-  { pattern: /\bDH\s+\S+/g, replacement: "" },
+  // D"H / DH / "dibur hamaschil" — strip the marker and ALL words following it
+  // up to (but not including) a preposition or number that starts the actual citation.
+  // e.g. "d"h hamevin yavo" in "Tosfos d"h hamevin yavo in Brachos" → stripped.
+  { pattern: new RegExp(`\\bD${DP}H\\s+(?:\\S+\\s+)*?(?=\\s*(?:in|on|at|al)\\b|\\d)`, "g"), replacement: "" },
+  { pattern: /\bDH\s+(?:\S+\s+)*?(?=\s*(?:in|on|at|al)\b|\d)/g, replacement: "" },
+  { pattern: /\bdibur\s+hamaschil\s+(?:\S+\s+)*?(?=\s*(?:in|on|at|al)\b|\d)/gi, replacement: "" },
   // ════════════════════════════════════════════════════════════════════════════
   // SECTION 6 — TALMUD TRACTATE ABBREVIATIONS (gershayim-style)
   // ════════════════════════════════════════════════════════════════════════════
