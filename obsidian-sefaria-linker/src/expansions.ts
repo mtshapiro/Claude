@@ -84,15 +84,6 @@ export const SHORTFORM_EXPANSIONS: ExpansionEntry[] = [
 	{ pattern: new RegExp(`\\bK${DP}H\\b`, "g"),  replacement: "Kiddushin" },
 
 	// ════════════════════════════════════════════════════════════════════════════
-	// SECTION 7 — SHULCHAN ARUKH SECTION SHORTHANDS (standalone, no siman)
-	// ════════════════════════════════════════════════════════════════════════════
-
-	{ pattern: new RegExp(`\\bY${DP}D\\b`, "g"),  replacement: "Yoreh Deah" },
-	{ pattern: new RegExp(`\\bO${DP}C\\b`, "g"),  replacement: "Orach Chaim" },
-	{ pattern: new RegExp(`\\bE${DP}H\\b`, "g"),  replacement: "Even HaEzer" },
-	{ pattern: new RegExp(`\\bC${DP}M\\b`, "g"),  replacement: "Choshen Mishpat" },
-
-	// ════════════════════════════════════════════════════════════════════════════
 	// SECTION 8 — TANAKH: TORAH (Hebrew/Ashkenazi → English canonical)
 	// More specific compound forms first, then single-word forms.
 	// ════════════════════════════════════════════════════════════════════════════
